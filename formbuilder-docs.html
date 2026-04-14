@@ -1,0 +1,1787 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FormBuilder3 — Project Documentation</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Serif+Display:ital@0;1&family=JetBrains+Mono:wght@400;600&family=Sora:wght@300;400;500;600;700&display=swap');
+
+  :root {
+    --bg: #0d0f14;
+    --bg2: #13161e;
+    --bg3: #1a1e28;
+    --border: #252a38;
+    --border2: #2e3448;
+    --text: #e8ecf4;
+    --text2: #8b92a8;
+    --text3: #565e78;
+    --accent: #5b7cf6;
+    --accent2: #7c9dff;
+    --green: #3ed9a0;
+    --amber: #f5a524;
+    --red: #f26363;
+    --purple: #c084fc;
+    --teal: #22d3ee;
+    --glow: rgba(91,124,246,0.15);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html { scroll-behavior: smooth; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Sora', sans-serif;
+    font-size: 15px;
+    line-height: 1.7;
+    overflow-x: hidden;
+  }
+
+  /* ── LAYOUT ── */
+  .layout { display: flex; min-height: 100vh; }
+
+  nav {
+    width: 260px;
+    min-width: 260px;
+    background: var(--bg2);
+    border-right: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    padding: 0 0 40px;
+    scrollbar-width: thin;
+    scrollbar-color: var(--border2) transparent;
+  }
+
+  .nav-header {
+    padding: 28px 24px 20px;
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    background: var(--bg2);
+    z-index: 10;
+  }
+
+  .nav-logo {
+    font-family: 'DM Serif Display', serif;
+    font-size: 20px;
+    color: var(--text);
+    letter-spacing: -0.5px;
+  }
+
+  .nav-logo span { color: var(--accent2); }
+
+  .nav-version {
+    font-size: 11px;
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text3);
+    margin-top: 4px;
+    background: var(--bg3);
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    border: 1px solid var(--border2);
+  }
+
+  .nav-section {
+    padding: 20px 24px 6px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1.5px;
+    color: var(--text3);
+  }
+
+  nav a {
+    display: block;
+    padding: 7px 24px;
+    color: var(--text2);
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 400;
+    transition: all 0.15s;
+    border-left: 2px solid transparent;
+    margin: 1px 0;
+  }
+
+  nav a:hover {
+    color: var(--text);
+    background: rgba(255,255,255,0.03);
+    border-left-color: var(--accent);
+  }
+
+  nav a.active {
+    color: var(--accent2);
+    border-left-color: var(--accent);
+    background: rgba(91,124,246,0.08);
+  }
+
+  main {
+    flex: 1;
+    padding: 60px 72px;
+    max-width: 1000px;
+  }
+
+  /* ── HERO ── */
+  .hero {
+    margin-bottom: 72px;
+    position: relative;
+  }
+
+  .hero-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: rgba(91,124,246,0.1);
+    border: 1px solid rgba(91,124,246,0.3);
+    border-radius: 100px;
+    padding: 5px 14px 5px 10px;
+    font-size: 12px;
+    color: var(--accent2);
+    margin-bottom: 24px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  .hero-badge .dot {
+    width: 6px; height: 6px;
+    background: var(--green);
+    border-radius: 50%;
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%,100% { opacity: 1; transform: scale(1); }
+    50% { opacity: 0.5; transform: scale(0.85); }
+  }
+
+  h1 {
+    font-family: 'DM Serif Display', serif;
+    font-size: 52px;
+    line-height: 1.1;
+    letter-spacing: -1.5px;
+    color: var(--text);
+    margin-bottom: 16px;
+  }
+
+  h1 em { color: var(--accent2); font-style: italic; }
+
+  .hero-desc {
+    font-size: 16px;
+    color: var(--text2);
+    max-width: 580px;
+    line-height: 1.7;
+    margin-bottom: 32px;
+  }
+
+  .hero-tags {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .tag {
+    font-size: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    padding: 4px 12px;
+    border-radius: 6px;
+    border: 1px solid var(--border2);
+    color: var(--text2);
+    background: var(--bg3);
+  }
+
+  .tag.green { border-color: rgba(62,217,160,0.3); color: var(--green); background: rgba(62,217,160,0.06); }
+  .tag.blue { border-color: rgba(91,124,246,0.3); color: var(--accent2); background: rgba(91,124,246,0.06); }
+  .tag.amber { border-color: rgba(245,165,36,0.3); color: var(--amber); background: rgba(245,165,36,0.06); }
+  .tag.purple { border-color: rgba(192,132,252,0.3); color: var(--purple); background: rgba(192,132,252,0.06); }
+
+  /* ── SECTIONS ── */
+  section { margin-bottom: 72px; }
+
+  h2 {
+    font-family: 'DM Serif Display', serif;
+    font-size: 32px;
+    letter-spacing: -0.8px;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+
+  .section-subtitle {
+    color: var(--text3);
+    font-size: 14px;
+    margin-bottom: 28px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  h3 {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text);
+    margin: 28px 0 12px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  h3::before {
+    content: '';
+    display: inline-block;
+    width: 3px;
+    height: 16px;
+    background: var(--accent);
+    border-radius: 2px;
+    flex-shrink: 0;
+  }
+
+  p { color: var(--text2); margin-bottom: 14px; }
+
+  /* ── CARDS ── */
+  .card-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 16px;
+    margin: 20px 0;
+  }
+
+  .card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    transition: border-color 0.2s, background 0.2s;
+  }
+
+  .card:hover {
+    border-color: var(--border2);
+    background: var(--bg3);
+  }
+
+  .card-icon {
+    font-size: 22px;
+    margin-bottom: 10px;
+  }
+
+  .card-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 6px;
+  }
+
+  .card-desc {
+    font-size: 12.5px;
+    color: var(--text3);
+    line-height: 1.6;
+  }
+
+  /* ── TABLE ── */
+  .table-wrap { overflow-x: auto; margin: 20px 0; border-radius: 12px; border: 1px solid var(--border); }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  thead th {
+    background: var(--bg3);
+    padding: 12px 16px;
+    text-align: left;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: var(--text3);
+    border-bottom: 1px solid var(--border);
+  }
+
+  tbody tr {
+    border-bottom: 1px solid var(--border);
+    transition: background 0.15s;
+  }
+
+  tbody tr:last-child { border-bottom: none; }
+  tbody tr:hover { background: rgba(255,255,255,0.02); }
+
+  td {
+    padding: 11px 16px;
+    color: var(--text2);
+    vertical-align: top;
+  }
+
+  td:first-child { color: var(--text); font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+
+  /* ── CODE BLOCKS ── */
+  .code-block {
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 20px;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12.5px;
+    color: var(--text2);
+    overflow-x: auto;
+    line-height: 1.7;
+    margin: 16px 0;
+    white-space: pre;
+  }
+
+  .code-block .kw { color: var(--purple); }
+  .code-block .str { color: var(--green); }
+  .code-block .comment { color: var(--text3); }
+  .code-block .type { color: var(--teal); }
+  .code-block .num { color: var(--amber); }
+
+  /* ── INLINE CODE ── */
+  code {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 12px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 2px 7px;
+    color: var(--accent2);
+  }
+
+  /* ── FLOW DIAGRAM ── */
+  .flow {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px 32px;
+    margin: 20px 0;
+  }
+
+  .flow-row {
+    display: flex;
+    align-items: center;
+    gap: 0;
+    flex-wrap: wrap;
+    margin: 6px 0;
+  }
+
+  .flow-box {
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: 8px;
+    padding: 8px 14px;
+    font-size: 13px;
+    color: var(--text);
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .flow-box.blue { border-color: rgba(91,124,246,0.4); background: rgba(91,124,246,0.08); color: var(--accent2); }
+  .flow-box.green { border-color: rgba(62,217,160,0.4); background: rgba(62,217,160,0.08); color: var(--green); }
+  .flow-box.amber { border-color: rgba(245,165,36,0.4); background: rgba(245,165,36,0.08); color: var(--amber); }
+  .flow-box.red { border-color: rgba(242,99,99,0.4); background: rgba(242,99,99,0.08); color: var(--red); }
+  .flow-box.purple { border-color: rgba(192,132,252,0.4); background: rgba(192,132,252,0.08); color: var(--purple); }
+  .flow-box.teal { border-color: rgba(34,211,238,0.4); background: rgba(34,211,238,0.08); color: var(--teal); }
+
+  .flow-arrow {
+    padding: 0 10px;
+    color: var(--text3);
+    font-size: 16px;
+  }
+
+  /* ── SUGGESTIONS ── */
+  .suggestion {
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--bg2);
+    margin-bottom: 16px;
+    overflow: hidden;
+  }
+
+  .suggestion-header {
+    padding: 16px 20px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .sug-badge {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    padding: 3px 10px;
+    border-radius: 100px;
+    flex-shrink: 0;
+  }
+
+  .sug-badge.bug { background: rgba(242,99,99,0.12); color: var(--red); border: 1px solid rgba(242,99,99,0.3); }
+  .sug-badge.qol { background: rgba(91,124,246,0.12); color: var(--accent2); border: 1px solid rgba(91,124,246,0.3); }
+  .sug-badge.security { background: rgba(245,165,36,0.12); color: var(--amber); border: 1px solid rgba(245,165,36,0.3); }
+  .sug-badge.perf { background: rgba(62,217,160,0.12); color: var(--green); border: 1px solid rgba(62,217,160,0.3); }
+  .sug-badge.unused { background: rgba(192,132,252,0.12); color: var(--purple); border: 1px solid rgba(192,132,252,0.3); }
+
+  .suggestion-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .suggestion-body {
+    padding: 16px 20px;
+    font-size: 13.5px;
+    color: var(--text2);
+    line-height: 1.75;
+  }
+
+  .suggestion-body strong { color: var(--text); font-weight: 600; }
+
+  /* ── PILL LIST ── */
+  .pill-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 12px 0;
+  }
+
+  .pill {
+    font-size: 12px;
+    font-family: 'JetBrains Mono', monospace;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    padding: 4px 10px;
+    color: var(--text2);
+  }
+
+  /* ── CALLOUT ── */
+  .callout {
+    border-radius: 10px;
+    padding: 14px 18px;
+    margin: 16px 0;
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    font-size: 13.5px;
+  }
+
+  .callout.info { background: rgba(91,124,246,0.08); border: 1px solid rgba(91,124,246,0.2); color: var(--accent2); }
+  .callout.warn { background: rgba(245,165,36,0.08); border: 1px solid rgba(245,165,36,0.2); color: var(--amber); }
+  .callout.danger { background: rgba(242,99,99,0.08); border: 1px solid rgba(242,99,99,0.2); color: var(--red); }
+  .callout.success { background: rgba(62,217,160,0.08); border: 1px solid rgba(62,217,160,0.2); color: var(--green); }
+
+  .callout-icon { font-size: 16px; flex-shrink: 0; margin-top: 1px; }
+  .callout-body { line-height: 1.65; }
+
+  /* ── DIVIDER ── */
+  hr { border: none; border-top: 1px solid var(--border); margin: 40px 0; }
+
+  /* ── DB SCHEMA ── */
+  .schema-table {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    margin: 16px 0;
+    overflow: hidden;
+  }
+
+  .schema-table-header {
+    background: var(--bg3);
+    padding: 12px 18px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .schema-table-name {
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--accent2);
+  }
+
+  .schema-table-num {
+    font-size: 11px;
+    color: var(--text3);
+    margin-left: auto;
+  }
+
+  .schema-col {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding: 9px 18px;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+    font-size: 12.5px;
+  }
+
+  .schema-col:last-child { border-bottom: none; }
+
+  .schema-col-name {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--text);
+    min-width: 200px;
+    flex-shrink: 0;
+  }
+
+  .schema-col-type {
+    font-family: 'JetBrains Mono', monospace;
+    color: var(--teal);
+    font-size: 11px;
+    min-width: 130px;
+    flex-shrink: 0;
+  }
+
+  .schema-col-desc { color: var(--text3); font-size: 12px; }
+
+  .pk { color: var(--amber) !important; }
+  .fk { color: var(--purple) !important; }
+
+  ul { padding-left: 20px; color: var(--text2); margin-bottom: 14px; }
+  ul li { margin: 5px 0; font-size: 14px; }
+  ul li strong { color: var(--text); }
+
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin: 20px 0; }
+
+  @media (max-width: 900px) {
+    main { padding: 40px 24px; }
+    nav { display: none; }
+    h1 { font-size: 36px; }
+    .two-col { grid-template-columns: 1fr; }
+  }
+
+  /* scroll spy highlight */
+  :target { scroll-margin-top: 100px; }
+</style>
+</head>
+<body>
+<div class="layout">
+
+<!-- ═══════════════ NAV ═══════════════ -->
+<nav>
+  <div class="nav-header">
+    <div class="nav-logo">Form<span>Builder</span></div>
+    <div class="nav-version">v3 · April 2026</div>
+  </div>
+
+  <div class="nav-section">Overview</div>
+  <a href="#overview">Project Summary</a>
+  <a href="#architecture">System Architecture</a>
+  <a href="#tech-stack">Tech Stack</a>
+
+  <div class="nav-section">Database</div>
+  <a href="#db-schema">Schema Overview</a>
+  <a href="#db-tables">All 17 Tables</a>
+  <a href="#dynamic-tables">Dynamic Submission Tables</a>
+
+  <div class="nav-section">Backend</div>
+  <a href="#backend-structure">Package Structure</a>
+  <a href="#controllers">Controllers & Endpoints</a>
+  <a href="#services">Core Services</a>
+  <a href="#security">Security & Auth</a>
+  <a href="#rule-engine">Rule Engine</a>
+  <a href="#workflow">Workflow System</a>
+  <a href="#limits">Limits & Guardrails</a>
+
+  <div class="nav-section">Frontend</div>
+  <a href="#frontend-structure">App Structure</a>
+  <a href="#pages">Pages & Routes</a>
+  <a href="#builder">Form Builder</a>
+  <a href="#components">Components</a>
+  <a href="#state">State Management</a>
+  <a href="#permissions">Permission System</a>
+
+  <div class="nav-section">Improvements</div>
+  <a href="#bugs">Bug Fixes</a>
+  <a href="#qol">Quality of Life</a>
+  <a href="#security-issues">Security Issues</a>
+  <a href="#unused">Unused Code</a>
+  <a href="#perf">Performance</a>
+</nav>
+
+<!-- ═══════════════ MAIN ═══════════════ -->
+<main>
+
+  <!-- HERO -->
+  <div class="hero" id="overview">
+    <div class="hero-badge">
+      <span class="dot"></span>
+      Internal Documentation · FormBuilder3
+    </div>
+    <h1>FormBuilder<em>3</em></h1>
+    <p class="hero-desc">A full-stack enterprise form management platform — drag-and-drop builder, dynamic storage, approval workflows, role-based access, and a public shareable form engine.</p>
+    <div class="hero-tags">
+      <span class="tag blue">Next.js 14</span>
+      <span class="tag green">Spring Boot 3</span>
+      <span class="tag amber">PostgreSQL 17</span>
+      <span class="tag purple">Session Auth</span>
+      <span class="tag">Zustand</span>
+      <span class="tag">dnd-kit</span>
+      <span class="tag">JPA/Hibernate</span>
+      <span class="tag">BCrypt</span>
+    </div>
+  </div>
+
+  <!-- ARCHITECTURE -->
+  <section id="architecture">
+    <h2>System Architecture</h2>
+    <p class="section-subtitle">Three-tier architecture: Next.js frontend ↔ Spring Boot REST API ↔ PostgreSQL database</p>
+
+    <div class="flow">
+      <div class="flow-row">
+        <div class="flow-box blue">Browser (Next.js)</div>
+        <div class="flow-arrow">→ HTTP/JSESSIONID →</div>
+        <div class="flow-box green">Spring Boot API :8080</div>
+        <div class="flow-arrow">→ JPA →</div>
+        <div class="flow-box amber">PostgreSQL :5432</div>
+      </div>
+    </div>
+
+    <h3>Key Architectural Decisions</h3>
+    <ul>
+      <li><strong>Session-based auth</strong> — Uses <code>JSESSIONID</code> cookies with <code>SameSite=Lax</code>. Not JWT. Session timeout is 15 minutes. Max 1 concurrent session per user.</li>
+      <li><strong>Dynamic DDL</strong> — When a form is published, <code>DynamicTableService</code> executes <code>CREATE TABLE</code> DDL at runtime to create a dedicated submissions table per form (e.g. <code>sub_my_form_v1</code>). No ORM entity — raw <code>JdbcTemplate</code> with SQL injection guards.</li>
+      <li><strong>Form Versioning</strong> — Every publish creates a <code>form_versions</code> snapshot. Submissions are forever tied to the exact version that was active when they were collected.</li>
+      <li><strong>Rule Engine</strong> — IF→THEN logic rules are stored as JSON in <code>form_versions.rules</code> and evaluated server-side by <code>RuleEngineService</code> on every submission. Prevents invalid data from reaching the DB.</li>
+      <li><strong>Feature flags</strong> — Workflow and LevelUp features are gated via <code>feature.workflow.enabled=true</code> in <code>application.properties</code>.</li>
+    </ul>
+
+    <h3>Data Flow: Form Submission</h3>
+    <div class="flow">
+      <div class="flow-row">
+        <div class="flow-box blue">User fills form</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box">POST /submissions</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box amber">Payload size check</div>
+      </div>
+      <div class="flow-row" style="margin-top:10px;">
+        <div class="flow-box amber">Version consistency check</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box purple">Expression validator</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box red">Rule engine</div>
+      </div>
+      <div class="flow-row" style="margin-top:10px;">
+        <div class="flow-box green">INSERT into dynamic table</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box teal">Workflow trigger (if chain)</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box green">Return submissionId</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TECH STACK -->
+  <section id="tech-stack">
+    <h2>Tech Stack</h2>
+    <p class="section-subtitle">All dependencies and their roles in the project</p>
+
+    <div class="two-col">
+      <div>
+        <h3>Backend (Java 17 / Spring Boot 3)</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Dependency</th><th>Purpose</th></tr></thead>
+            <tbody>
+              <tr><td>Spring Web</td><td>REST API, controllers</td></tr>
+              <tr><td>Spring Data JPA</td><td>ORM, repositories</td></tr>
+              <tr><td>Spring Security</td><td>Session auth, method security</td></tr>
+              <tr><td>Spring Mail</td><td>Async email via SMTP (Gmail)</td></tr>
+              <tr><td>JdbcTemplate</td><td>Raw SQL for dynamic DDL/DML</td></tr>
+              <tr><td>Hibernate 6</td><td>JPA impl, camel→snake naming</td></tr>
+              <tr><td>BCrypt</td><td>Password hashing</td></tr>
+              <tr><td>Lombok</td><td>Boilerplate reduction</td></tr>
+              <tr><td>Jackson</td><td>JSON ↔ Java, enums-as-strings</td></tr>
+              <tr><td>Jakarta Validation</td><td>DTO bean validation</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div>
+        <h3>Frontend (Next.js 14 App Router)</h3>
+        <div class="table-wrap">
+          <table>
+            <thead><tr><th>Library</th><th>Purpose</th></tr></thead>
+            <tbody>
+              <tr><td>Next.js 14</td><td>App Router, SSR/CSR pages</td></tr>
+              <tr><td>React 18</td><td>UI components</td></tr>
+              <tr><td>TypeScript</td><td>Type safety throughout</td></tr>
+              <tr><td>Zustand</td><td>Global state for form builder</td></tr>
+              <tr><td>dnd-kit</td><td>Drag-and-drop builder canvas</td></tr>
+              <tr><td>Sonner</td><td>Toast notifications</td></tr>
+              <tr><td>Lucide React</td><td>Icon library</td></tr>
+              <tr><td>Tailwind CSS</td><td>Utility-first styling</td></tr>
+              <tr><td>CSS Variables</td><td>Theme system (light/dark)</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- DATABASE SCHEMA -->
+  <section id="db-schema">
+    <h2>Database Schema</h2>
+    <p class="section-subtitle">PostgreSQL 17 · 17 static tables + N dynamic submission tables per published form</p>
+
+    <div class="callout info">
+      <span class="callout-icon">ℹ️</span>
+      <span class="callout-body">All primary keys are <strong>UUID</strong>. Timestamps use either <code>TIMESTAMP WITH TIME ZONE</code> (for forms/versions/submissions) or <code>TIMESTAMP WITHOUT TIME ZONE</code> (for older tables like users, audit_logs). This inconsistency is a known issue.</span>
+    </div>
+
+    <h3>Entity Relationship Summary</h3>
+    <div class="flow">
+      <div style="font-family:'JetBrains Mono',monospace; font-size:12px; color:var(--text2); line-height:2;">
+<span style="color:var(--accent2)">users</span> ──── user_form_roles ──── <span style="color:var(--accent2)">roles</span> ──── role_permissions ──── <span style="color:var(--accent2)">permissions</span>
+                                           └──── role_modules ──── <span style="color:var(--accent2)">modules</span>
+
+<span style="color:var(--green)">forms</span> ──── <span style="color:var(--green)">form_versions</span> ──── <span style="color:var(--green)">form_fields</span>
+        │                  └──── <span style="color:var(--green)">field_validations</span>
+        ├──── form_submission_meta
+        ├──── workflow_instances ──── workflow_steps
+        └──── [Dynamic: sub_{form_code}_v{N}]   ← created on publish
+
+<span style="color:var(--text3)">audit_logs</span>  <span style="color:var(--text3)">level_up_requests</span>  <span style="color:var(--text3)">system_configurations</span>
+      </div>
+    </div>
+  </section>
+
+  <section id="db-tables">
+    <h2>All 17 Tables</h2>
+    <p class="section-subtitle">Complete column reference with types and notes</p>
+
+    <!-- USERS -->
+    <div class="schema-table">
+      <div class="schema-table-header">
+        <span class="schema-table-name">users</span>
+        <span style="font-size:12px;color:var(--text3)">Application users — 5 columns</span>
+        <span class="schema-table-num">#1</span>
+      </div>
+      <div class="schema-col"><span class="schema-col-name pk">id</span><span class="schema-col-type">UUID PK</span><span class="schema-col-desc">Primary key</span></div>
+      <div class="schema-col"><span class="schema-col-name">username</span><span class="schema-col-type">VARCHAR(255) UNIQUE</span><span class="schema-col-desc">Login name — used as principal in Spring Security</span></div>
+      <div class="schema-col"><span class="schema-col-name">password_hash</span><span class="schema-col-type">VARCHAR(255)</span><span class="schema-col-desc">BCrypt hashed password</span></div>
+      <div class="schema-col"><span class="schema-col-name">deleted</span><span class="schema-col-type">BOOLEAN</span><span class="schema-col-desc">Soft delete flag</span></div>
+      <div class="schema-col"><span class="schema-col-name">created_at</span><span class="schema-col-type">TIMESTAMP</span><span class="schema-col-desc">No timezone — potential issue</span></div>
+    </div>
+
+    <!-- ROLES -->
+    <div class="schema-table">
+      <div class="schema-table-header">
+        <span class="schema-table-name">roles</span>
+        <span style="font-size:12px;color:var(--text3)">Role definitions — seeded: ADMIN, ROLE_ADMIN, USER, BUILDER</span>
+        <span class="schema-table-num">#2</span>
+      </div>
+      <div class="schema-col"><span class="schema-col-name pk">id</span><span class="schema-col-type">UUID PK</span><span class="schema-col-desc"></span></div>
+      <div class="schema-col"><span class="schema-col-name">name</span><span class="schema-col-type">VARCHAR(255) UNIQUE</span><span class="schema-col-desc">e.g. ADMIN, BUILDER, USER</span></div>
+      <div class="schema-col"><span class="schema-col-name">description</span><span class="schema-col-type">VARCHAR(255)</span><span class="schema-col-desc"></span></div>
+      <div class="schema-col"><span class="schema-col-name">created_by</span><span class="schema-col-type">VARCHAR(255)</span><span class="schema-col-desc">Username of creator</span></div>
+      <div class="schema-col"><span class="schema-col-name fk">parent_role_id</span><span class="schema-col-type">UUID → roles(id)</span><span class="schema-col-desc">Hierarchical role inheritance (currently unused)</span></div>
+    </div>
+
+    <!-- PERMISSIONS -->
+    <div class="schema-table">
+      <div class="schema-table-header">
+        <span class="schema-table-name">permissions</span>
+        <span style="font-size:12px;color:var(--text3)">9 seeded: MANAGE, READ, WRITE, EDIT, AUDIT, DELETE, EXPORT, APPROVE, VISIBILITY</span>
+        <span class="schema-table-num">#3</span>
+      </div>
+      <div class="schema-col"><span class="schema-col-name pk">id</span><span class="schema-col-type">UUID PK</span><span class="schema-col-desc"></span></div>
+      <div class="schema-col"><span class="schema-col-name">name</span><span class="schema-col-type">VARCHAR(255) UNIQUE</span><span class="schema-col-desc">Permission key</span></div>
+      <div class="schema-col"><span class="schema-col-name">category</span><span class="schema-col-type">VARCHAR(255)</span><span class="schema-col-desc">e.g. System</span></div>
+      <div class="schema-col"><span class="schema-col-name">feature_id</span><span class="schema-col-type">VARCHAR(255)</span><span class="schema-col-desc">Currently all 'ALL'</span></div>
+    </div>
+
+    <!-- FORMS -->
+    <div class="schema-table">
+      <div class="schema-table-header">
+        <span class="schema-table-name">forms</span>
+        <span style="font-size:12px;color:var(--text3)">Core form metadata — 18 columns</span>
+        <span class="schema-table-num">#8</span>
+      </div>
+      <div class="schema-col"><span class="schema-col-name pk">id</span><span class="schema-col-type">UUID PK</span><span class="schema-col-desc"></span></div>
+      <div class="schema-col"><span class="schema-col-name">name</span><span class="schema-col-type">VARCHAR(255)</span><span class="schema-col-desc">Form title displayed everywhere</span></div>
+      <div class="schema-col"><span class="schema-col-name">code</span><span class="schema-col-type">VARCHAR(255) UNIQUE</span><span class="schema-col-desc">Slug used as table prefix — immutable once locked. Regex: <code>^[a-z][a-z0-9_]{0,99}$</code></span></div>
+      <div class="schema-col"><span class="schema-col-name">status</span><span class="schema-col-type">VARCHAR(255)</span><span class="schema-col-desc">DRAFT | PUBLISHED | ARCHIVED | PENDING_DRAFT | PENDING_PUBLISH | REJECTED</span></div>
+      <div class="schema-col"><span class="schema-col-name">code_locked</span><span class="schema-col-type">BOOLEAN</span><span class="schema-col-desc">Once published, code cannot change</span></div>
+      <div class="schema-col"><span class="schema-col-name">allow_edit_response</span><span class="schema-col-type">BOOLEAN</span><span class="schema-col-desc">Respondents can re-edit their submission</span></div>
+      <div class="schema-col"><span class="schema-col-name">public_share_token</span><span class="schema-col-type">VARCHAR(255) UNIQUE</span><span class="schema-col-desc">UUID token for public /f/{token} access</span></div>
+      <div class="schema-col"><span class="schema-col-name">target_table_name</span><span class="schema-col-type">VARCHAR(255)</span><span class="schema-col-desc">e.g. sub_my_form_v1 — the dynamic submissions table</span></div>
+      <div class="schema-col"><span class="schema-col-name">approval_chain</span><span class="schema-col-type">TEXT</span><span class="schema-col-desc">JSON array of approver usernames for workflow</span></div>
+      <div class="schema-col"><span class="schema-col-name fk">owner_id</span><span class="schema-col-type">UUID → users(id)</span><span class="schema-col-desc">Current owner (can change)</span></div>
+      <div class="schema-col"><span class="schema-col-name fk">creator_id</span><span class="schema-col-type">UUID → users(id)</span><span class="schema-col-desc">Original creator (immutable)</span></div>
+    </div>
+
+    <!-- FORM_VERSIONS -->
+    <div class="schema-table">
+      <div class="schema-table-header">
+        <span class="schema-table-name">form_versions</span>
+        <span style="font-size:12px;color:var(--text3)">Immutable publish snapshots</span>
+        <span class="schema-table-num">#9</span>
+      </div>
+      <div class="schema-col"><span class="schema-col-name pk">id</span><span class="schema-col-type">UUID PK</span><span class="schema-col-desc"></span></div>
+      <div class="schema-col"><span class="schema-col-name fk">form_id</span><span class="schema-col-type">UUID → forms(id)</span><span class="schema-col-desc"></span></div>
+      <div class="schema-col"><span class="schema-col-name">version_number</span><span class="schema-col-type">INTEGER</span><span class="schema-col-desc">Monotonically increasing per form</span></div>
+      <div class="schema-col"><span class="schema-col-name">is_active</span><span class="schema-col-type">BOOLEAN</span><span class="schema-col-desc">Only one version per form is active at a time</span></div>
+      <div class="schema-col"><span class="schema-col-name">definition_json</span><span class="schema-col-type">JSONB</span><span class="schema-col-desc">Full form schema snapshot</span></div>
+      <div class="schema-col"><span class="schema-col-name">rules</span><span class="schema-col-type">TEXT</span><span class="schema-col-desc">JSON array of FormRuleDTO — evaluated by RuleEngineService</span></div>
+      <div class="schema-col"><span class="schema-col-name">change_log</span><span class="schema-col-type">TEXT</span><span class="schema-col-desc">Human-readable description of changes</span></div>
+    </div>
+
+    <!-- FORM_FIELDS -->
+    <div class="schema-table">
+      <div class="schema-table-header">
+        <span class="schema-table-name">form_fields</span>
+        <span style="font-size:12px;color:var(--text3)">Field definitions per version — 17 columns</span>
+        <span class="schema-table-num">#10</span>
+      </div>
+      <div class="schema-col"><span class="schema-col-name pk">id</span><span class="schema-col-type">UUID PK</span><span class="schema-col-desc"></span></div>
+      <div class="schema-col"><span class="schema-col-name fk">form_version_id</span><span class="schema-col-type">UUID → form_versions(id)</span><span class="schema-col-desc"></span></div>
+      <div class="schema-col"><span class="schema-col-name">field_key</span><span class="schema-col-type">VARCHAR(255)</span><span class="schema-col-desc">Snake_case column name — maps to dynamic table column</span></div>
+      <div class="schema-col"><span class="schema-col-name">field_type</span><span class="schema-col-type">VARCHAR(255)</span><span class="schema-col-desc">TEXT|NUMERIC|DATE|BOOLEAN|DROPDOWN|RADIO|CHECKBOX_GROUP|TIME|RATING|SCALE|FILE|GRID_RADIO|GRID_CHECK|LOOKUP|CALCULATED|SECTION_HEADER|INFO_LABEL|PAGE_BREAK|DATE_TIME|HIDDEN</span></div>
+      <div class="schema-col"><span class="schema-col-name">config_json</span><span class="schema-col-type">JSONB</span><span class="schema-col-desc">Field-specific config (grid rows/cols, lookup settings, etc.)</span></div>
+      <div class="schema-col"><span class="schema-col-name">validation_rules</span><span class="schema-col-type">JSONB</span><span class="schema-col-desc">min, max, minLength, maxLength, pattern</span></div>
+      <div class="schema-col"><span class="schema-col-name">calculation_formula</span><span class="schema-col-type">TEXT</span><span class="schema-col-desc">JS-like expression for CALCULATED field types</span></div>
+      <div class="schema-col"><span class="schema-col-name">display_order</span><span class="schema-col-type">INTEGER</span><span class="schema-col-desc">Field order on canvas</span></div>
+      <div class="schema-col"><span class="schema-col-name">parent_column_name</span><span class="schema-col-type">VARCHAR(255)</span><span class="schema-col-desc">Set for child fields (nested inside SECTION_HEADER)</span></div>
+    </div>
+
+    <!-- Remaining tables summary -->
+    <div class="table-wrap" style="margin-top:24px;">
+      <table>
+        <thead><tr><th>#</th><th>Table</th><th>Purpose</th><th>Key Columns</th></tr></thead>
+        <tbody>
+          <tr><td>4</td><td>modules</td><td>Navigation modules shown per role</td><td>module_name, prefix, icon_css, is_parent</td></tr>
+          <tr><td>5</td><td>user_form_roles</td><td>User↔Role assignments (optionally scoped to a form)</td><td>user_id, role_id, form_id (nullable)</td></tr>
+          <tr><td>6</td><td>role_permissions</td><td>Role↔Permission mapping (junction)</td><td>(role_id, permission_id) PK</td></tr>
+          <tr><td>7</td><td>role_modules</td><td>Role↔Module mapping (junction)</td><td>role_id, module_id</td></tr>
+          <tr><td>11</td><td>field_validations</td><td>Custom server-side validation expressions per form version</td><td>expression, error_message, scope (FORM|FIELD), execution_order</td></tr>
+          <tr><td>12</td><td>form_submission_meta</td><td>Metadata record for every submission (audit trail)</td><td>form_id, submission_row_id, status, submitted_by</td></tr>
+          <tr><td>13</td><td>workflow_instances</td><td>One approval chain per form-publish request</td><td>creator_id, target_builder_id, current_step_index, total_steps, status</td></tr>
+          <tr><td>14</td><td>workflow_steps</td><td>Individual approver decisions in a workflow</td><td>approver_id, step_index, status, comments, decided_at</td></tr>
+          <tr><td>15</td><td>audit_logs</td><td>Complete action audit trail</td><td>action, actor, resource_type, resource_id, details</td></tr>
+          <tr><td>16</td><td>level_up_requests</td><td>User requests to be promoted to BUILDER role</td><td>user_id, status (PENDING|APPROVED|REJECTED), decided_by</td></tr>
+          <tr><td>17</td><td>system_configurations</td><td>Key-value config store (currently unused)</td><td>config_key (unique), config_value</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="dynamic-tables">
+    <h2>Dynamic Submission Tables</h2>
+    <p class="section-subtitle">Tables created at runtime by DynamicTableService when a form is published</p>
+
+    <p>Every published form gets its own PostgreSQL table named <code>sub_{form_code}_v{version}</code>. This is the most architecturally interesting — and risky — part of the system.</p>
+
+    <h3>Standard Columns (always present)</h3>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Column</th><th>Type</th><th>Purpose</th></tr></thead>
+        <tbody>
+          <tr><td>id</td><td>UUID DEFAULT gen_random_uuid()</td><td>Submission row identifier (= submissionId returned to client)</td></tr>
+          <tr><td>form_version_id</td><td>UUID</td><td>Which version's schema was active</td></tr>
+          <tr><td>submitted_by</td><td>VARCHAR(100)</td><td>Username or "Anonymous"</td></tr>
+          <tr><td>is_draft</td><td>BOOLEAN DEFAULT FALSE</td><td>RESPONSE_DRAFT vs FINAL</td></tr>
+          <tr><td>submitted_at</td><td>TIMESTAMP DEFAULT NOW()</td><td>Submission timestamp</td></tr>
+          <tr><td>updated_at</td><td>TIMESTAMP DEFAULT NOW()</td><td>Last edit timestamp</td></tr>
+          <tr><td>submission_status</td><td>VARCHAR(20) DEFAULT 'SUBMITTED'</td><td>SUBMITTED | PENDING | APPROVED | REJECTED</td></tr>
+          <tr><td>is_deleted</td><td>BOOLEAN DEFAULT FALSE</td><td>Soft-delete flag</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <h3>Field Type → SQL Type Mapping</h3>
+    <div class="pill-list">
+      <span class="pill">TEXT → VARCHAR(1000)</span>
+      <span class="pill">NUMERIC → NUMERIC</span>
+      <span class="pill">DATE → DATE</span>
+      <span class="pill">DATE_TIME → TIMESTAMP</span>
+      <span class="pill">TIME → TIME</span>
+      <span class="pill">BOOLEAN → BOOLEAN</span>
+      <span class="pill">TEXTAREA → TEXT</span>
+      <span class="pill">DROPDOWN/RADIO → VARCHAR(500)</span>
+      <span class="pill">CHECKBOX_GROUP → TEXT</span>
+      <span class="pill">FILE → TEXT (stores path/URL)</span>
+      <span class="pill">RATING/SCALE → INTEGER</span>
+      <span class="pill">CALCULATED → TEXT</span>
+      <span class="pill">GRID_RADIO/GRID_CHECK → TEXT (JSON)</span>
+      <span class="pill">LOOKUP → TEXT</span>
+      <span class="pill">HIDDEN → TEXT</span>
+    </div>
+
+    <div class="callout warn">
+      <span class="callout-icon">⚠️</span>
+      <span class="callout-body">PostgreSQL truncates identifiers to 63 characters. <code>DynamicTableService.repairLongFieldKeys()</code> fixes metadata but doesn't rename existing columns. Field keys must be kept short.</span>
+    </div>
+  </section>
+
+  <!-- BACKEND -->
+  <section id="backend-structure">
+    <h2>Backend Package Structure</h2>
+    <p class="section-subtitle">com.sttl.formbuilder2 — Spring Boot 3 monolith</p>
+    <div class="code-block"><span class="comment">// src/main/java/com/sttl/formbuilder2/</span>
+├── <span class="type">config/</span>
+│   ├── AsyncConfig.java              <span class="comment">// @EnableAsync for email</span>
+│   ├── FormBuilderLimitsConfig.java  <span class="comment">// SRS limits (50 fields, 100 validations, etc.)</span>
+│   └── WebConfig.java                <span class="comment">// CORS, MVC config</span>
+├── <span class="type">controller/</span>
+│   ├── AuditController, AuthController, FileUploadController
+│   ├── FormController, FormVersionController
+│   ├── LevelUpController, MenuController
+│   ├── ModuleController, PermissionController
+│   ├── ProfileController, RoleController, RoleModuleController
+│   ├── RuntimeController, UserController, WorkflowController
+├── <span class="type">dto/</span>
+│   ├── internal/     <span class="comment">// FormRuleDTO, ConditionGroupDTO, RuleActionDTO, etc.</span>
+│   ├── request/      <span class="comment">// CreateFormRequestDTO, UpdateFormRequestDTO, SubmissionRequestDTO</span>
+│   └── response/     <span class="comment">// FormDetailResponseDTO, FormSummaryResponseDTO, etc.</span>
+├── <span class="type">exception/</span>
+│   ├── FormBuilderException.java     <span class="comment">// Domain-specific with error code</span>
+│   ├── GlobalExceptionHandler.java   <span class="comment">// @RestControllerAdvice</span>
+│   └── ExpressionEvaluationException.java
+├── <span class="type">model/</span>
+│   ├── entity/       <span class="comment">// AppUser, Form, FormVersion, FormField, Role, etc.</span>
+│   └── enums/        <span class="comment">// FieldType, FormStatus, ActionType, RuleOperator, ConditionLogic</span>
+├── <span class="type">repository/</span>    <span class="comment">// Spring Data JPA repositories (17 total)</span>
+├── <span class="type">security/</span>
+│   ├── SecurityConfig.java            <span class="comment">// Session auth, CORS, filter chain</span>
+│   ├── CustomUserDetailsService.java  <span class="comment">// Loads user + roles as Spring authorities</span>
+│   └── CustomPermissionEvaluator.java <span class="comment">// @PreAuthorize hasPermission()</span>
+├── <span class="type">service/</span>
+│   ├── FormService.java          <span class="comment">// Core form CRUD, publish flow</span>
+│   ├── SubmissionService.java    <span class="comment">// Submit/update/delete/export submissions</span>
+│   ├── DynamicTableService.java  <span class="comment">// CREATE/ALTER TABLE DDL at runtime</span>
+│   ├── RuleEngineService.java    <span class="comment">// IF→THEN logic evaluation on submit</span>
+│   ├── ExpressionEvaluatorService.java <span class="comment">// Groovy-like expression parsing</span>
+│   ├── CalculationService.java   <span class="comment">// CALCULATED field evaluation</span>
+│   ├── WorkflowService.java      <span class="comment">// Approval workflow state machine</span>
+│   ├── AuditService.java         <span class="comment">// Writes to audit_logs</span>
+│   ├── EmailNotificationService.java <span class="comment">// Async email via JavaMailSender</span>
+│   ├── FormVersionService.java   <span class="comment">// Version history management</span>
+│   ├── DraftService.java         <span class="comment">// Draft submission save/load</span>
+│   ├── FormMapper.java           <span class="comment">// Entity ↔ DTO mapping</span>
+│   ├── RoleService.java          <span class="comment">// Role CRUD + permission assignment</span>
+│   ├── UserService.java          <span class="comment">// User CRUD</span>
+│   ├── ModuleService.java        <span class="comment">// Module CRUD</span>
+│   └── StartupSchemaValidator.java <span class="comment">// Validates DB schema on startup</span>
+└── <span class="type">util/</span>
+    ├── ApiConstants.java          <span class="comment">// All URL path constants</span>
+    └── SqlKeywordValidator.java   <span class="comment">// SQL injection prevention</span></div>
+  </section>
+
+  <section id="controllers">
+    <h2>Controllers & API Endpoints</h2>
+    <p class="section-subtitle">Base URL: <code>http://localhost:8080/api/v1</code></p>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Controller</th><th>Base Path</th><th>Key Endpoints</th><th>Auth Required</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>AuthController</td>
+            <td>/auth</td>
+            <td>POST /login, POST /logout, POST /register, GET /me, GET /permissions</td>
+            <td>Login/Register: No</td>
+          </tr>
+          <tr>
+            <td>FormController</td>
+            <td>/forms</td>
+            <td>GET /forms, POST /forms, GET /forms/{id}, PUT /forms/{id}, DELETE /forms/{id}, PUT /forms/{id}/restore, DELETE /forms/{id}/permanent, GET /forms/archived, GET /forms/stats, GET/POST /forms/public/{token}[/submissions[/{id}]]</td>
+            <td>Yes (public/* No)</td>
+          </tr>
+          <tr>
+            <td>FormController (submissions)</td>
+            <td>/forms/{id}/submissions</td>
+            <td>GET, POST, GET /{subId}, PUT /{subId}, DELETE /{subId}, POST /bulk, POST /{subId}/restore, GET /export, GET /columns/{field}/values</td>
+            <td>Yes (values: No)</td>
+          </tr>
+          <tr>
+            <td>FormVersionController</td>
+            <td>/forms/{id}/versions</td>
+            <td>GET, POST, GET /{vId}, PUT /{vId}/activate</td>
+            <td>Yes</td>
+          </tr>
+          <tr>
+            <td>WorkflowController</td>
+            <td>/workflows</td>
+            <td>POST /initiate, POST /{id}/approve, POST /{id}/reject, GET /authorities, GET /my-submissions, GET /my-handled, GET /my-pending</td>
+            <td>Yes</td>
+          </tr>
+          <tr>
+            <td>LevelUpController</td>
+            <td>/level-up</td>
+            <td>POST /request, GET /pending (ADMIN), POST /{id}/decide (ADMIN)</td>
+            <td>Yes</td>
+          </tr>
+          <tr>
+            <td>RuntimeController</td>
+            <td>/runtime</td>
+            <td>GET /forms/{code}, POST /forms/{code}/submissions, POST /forms/{code}/drafts</td>
+            <td>Yes</td>
+          </tr>
+          <tr>
+            <td>UserController</td>
+            <td>/users</td>
+            <td>GET, POST, GET /{id}, PUT /{id}, DELETE /{id}</td>
+            <td>ADMIN</td>
+          </tr>
+          <tr>
+            <td>RoleController</td>
+            <td>/roles</td>
+            <td>GET, POST, PUT /{id}, DELETE /{id}, POST /{id}/permissions, GET /{id}/users</td>
+            <td>ADMIN</td>
+          </tr>
+          <tr>
+            <td>ModuleController</td>
+            <td>/modules</td>
+            <td>GET, POST, PUT /{id}, DELETE /{id}</td>
+            <td>ADMIN</td>
+          </tr>
+          <tr>
+            <td>AuditController</td>
+            <td>/audit</td>
+            <td>GET /logs (paginated, filterable)</td>
+            <td>AUDIT permission</td>
+          </tr>
+          <tr>
+            <td>FileUploadController</td>
+            <td>/upload, /files</td>
+            <td>POST /upload (multipart), GET /files/{filename}</td>
+            <td>No</td>
+          </tr>
+          <tr>
+            <td>ProfileController</td>
+            <td>/profile</td>
+            <td>GET, PUT (change password)</td>
+            <td>Yes</td>
+          </tr>
+          <tr>
+            <td>MenuController</td>
+            <td>/menu</td>
+            <td>GET (returns modules for current user's roles)</td>
+            <td>Yes</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="services">
+    <h2>Core Services Deep Dive</h2>
+    <p class="section-subtitle">Business logic responsibilities</p>
+
+    <h3>FormService</h3>
+    <p>The largest service (~900 lines). Handles form CRUD, publish lifecycle, and validation. Key responsibilities:</p>
+    <ul>
+      <li>Validates form <code>code</code> with regex <code>^[a-z][a-z0-9_]{0,99}$</code> and checks reserved SQL keywords</li>
+      <li>On publish: calls <code>DynamicTableService.createDynamicTable()</code> or <code>alterDynamicTable()</code></li>
+      <li>Sets <code>code_locked = true</code> on first publish to prevent table renames</li>
+      <li>Generates <code>public_share_token</code> (UUID) on publish</li>
+      <li>Enforces <code>FormBuilderLimitsConfig</code>: max 50 fields, 100 validations, 10 pages</li>
+      <li>Contains duplicate <code>validateFormCode()</code> overloads — one for create, one for update with exclude</li>
+    </ul>
+
+    <h3>SubmissionService</h3>
+    <p>Handles the full submission lifecycle. Chain of responsibility on submit:</p>
+    <div class="flow">
+      <div class="flow-row">
+        <div class="flow-box">Payload size ≤ 100KB</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box">Form is PUBLISHED</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box">Version match</div>
+      </div>
+      <div class="flow-row" style="margin-top:8px;">
+        <div class="flow-box purple">ExpressionEvaluator</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box red">RuleEngine VALIDATE</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box green">Dynamic INSERT</div>
+      </div>
+      <div class="flow-row" style="margin-top:8px;">
+        <div class="flow-box teal">Workflow trigger</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box amber">Email SEND_EMAIL rules</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box green">Return submissionId</div>
+      </div>
+    </div>
+
+    <h3>DynamicTableService</h3>
+    <p>Executes raw DDL via <code>JdbcTemplate</code>. Uses parameterized queries for DML but builds DDL with string concatenation (field keys are validated via <code>SqlKeywordValidator</code> before reaching here). Key methods:</p>
+    <ul>
+      <li><code>createDynamicTable()</code> — CREATE TABLE IF NOT EXISTS with standard columns + form fields</li>
+      <li><code>alterDynamicTable()</code> — ADD COLUMN for new fields added in a re-publish</li>
+      <li><code>getSubmissions()</code> — paginated SELECT with dynamic WHERE clauses and ORDER BY</li>
+      <li><code>getColumnValues()</code> — SELECT DISTINCT for LOOKUP field dropdowns</li>
+      <li><code>repairLongFieldKeys()</code> — utility to fix 63-char PostgreSQL limit violations</li>
+    </ul>
+
+    <h3>RuleEngineService</h3>
+    <p>Evaluates stored JSON rules against submitted data. Supports nested <code>ConditionGroup</code>s with AND/OR logic. Triggered actions: <code>VALIDATION_ERROR</code> (throws HTTP 400), <code>REQUIRE</code> (checks field not empty), <code>SEND_EMAIL</code> (triggers async email).</p>
+
+    <h3>ExpressionEvaluatorService</h3>
+    <p>Parses and evaluates custom validation expressions (e.g. <code>field_a > field_b</code>). Used for <code>field_validations</code> table entries before insertion. Has its own lexer/parser — not using Groovy or SpEL.</p>
+
+    <h3>WorkflowService</h3>
+    <p>State machine for the approval workflow. A <code>WorkflowInstance</code> has N <code>WorkflowStep</code>s. Steps are evaluated sequentially. Approval advances <code>current_step_index</code>. Full approval → form status becomes PUBLISHED. Rejection → form status becomes REJECTED.</p>
+  </section>
+
+  <section id="security">
+    <h2>Security & Authentication</h2>
+    <p class="section-subtitle">Spring Security with session cookies — no JWT</p>
+
+    <h3>Authentication Flow</h3>
+    <div class="flow">
+      <div class="flow-row">
+        <div class="flow-box blue">POST /auth/login {username, password}</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box">DaoAuthenticationProvider + BCrypt</div>
+      </div>
+      <div class="flow-row" style="margin-top:8px;">
+        <div class="flow-box">CustomUserDetailsService loads user + roles</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box green">Set-Cookie: JSESSIONID (15m timeout)</div>
+      </div>
+    </div>
+
+    <h3>Public Endpoints (no auth)</h3>
+    <div class="pill-list">
+      <span class="pill">/api/v1/forms/public/**</span>
+      <span class="pill">/api/v1/forms/*/columns/*/values</span>
+      <span class="pill">/api/v1/upload</span>
+      <span class="pill">/api/v1/files/**</span>
+      <span class="pill">POST /api/v1/auth/login</span>
+      <span class="pill">POST /api/v1/auth/register</span>
+      <span class="pill">/v3/api-docs/** (Swagger)</span>
+    </div>
+
+    <h3>Role-Based Access</h3>
+    <p>Roles are loaded as Spring Security <code>GrantedAuthority</code> objects prefixed with <code>ROLE_</code>. Method-level security uses <code>@PreAuthorize</code>. The <code>CustomPermissionEvaluator</code> handles <code>hasPermission()</code> checks against the permissions table.</p>
+
+    <div class="callout danger">
+      <span class="callout-icon">🔴</span>
+      <span class="callout-body"><strong>Security Issue:</strong> <code>application.properties</code> contains a hardcoded Gmail SMTP password in plaintext. This must be moved to environment variables before any deployment.</span>
+    </div>
+
+    <div class="callout warn">
+      <span class="callout-icon">⚠️</span>
+      <span class="callout-body"><strong>CSRF disabled</strong> — The comment in <code>SecurityConfig</code> says this is intentional for a decoupled SPA. This is acceptable because the session cookie has <code>SameSite=Lax</code> by default on modern browsers, but should be documented explicitly.</span>
+    </div>
+  </section>
+
+  <section id="rule-engine">
+    <h2>Rule Engine</h2>
+    <p class="section-subtitle">Server-side IF→THEN logic evaluation on every form submission</p>
+
+    <h3>Rule Structure (stored as JSON in form_versions.rules)</h3>
+    <div class="code-block">{
+  <span class="str">"id"</span>: <span class="str">"uuid"</span>,
+  <span class="str">"name"</span>: <span class="str">"Show GitHub field for Engineers"</span>,
+  <span class="str">"conditionLogic"</span>: <span class="str">"AND"</span> <span class="comment">// OR | AND</span>,
+  <span class="str">"conditions"</span>: [
+    {
+      <span class="str">"field"</span>: <span class="str">"department"</span>,     <span class="comment">// field_key</span>
+      <span class="str">"operator"</span>: <span class="str">"EQUALS"</span>,     <span class="comment">// EQUALS|NOT_EQUALS|GT|LT|CONTAINS</span>
+      <span class="str">"value"</span>: <span class="str">"Engineering"</span>,
+      <span class="str">"valueType"</span>: <span class="str">"STATIC"</span>    <span class="comment">// STATIC | FIELD</span>
+    }
+  ],
+  <span class="str">"actions"</span>: [
+    { <span class="str">"type"</span>: <span class="str">"SHOW"</span>, <span class="str">"targetField"</span>: <span class="str">"github_url"</span> },      <span class="comment">// Frontend only</span>
+    { <span class="str">"type"</span>: <span class="str">"REQUIRE"</span>, <span class="str">"targetField"</span>: <span class="str">"github_url"</span> }, <span class="comment">// Backend validated</span>
+    { <span class="str">"type"</span>: <span class="str">"VALIDATION_ERROR"</span>, <span class="str">"message"</span>: <span class="str">"..."</span> },<span class="comment">// HTTP 400</span>
+    { <span class="str">"type"</span>: <span class="str">"SEND_EMAIL"</span>, <span class="str">"message"</span>: <span class="str">"user@example.com"</span> } <span class="comment">// Async</span>
+  ]
+}</div>
+
+    <p><strong>Frontend-only actions</strong> (SHOW, HIDE, ENABLE, DISABLE) are evaluated in <code>FormRenderer.tsx</code> at fill time but NOT enforced server-side. Only REQUIRE and VALIDATION_ERROR are enforced on the backend.</p>
+  </section>
+
+  <section id="workflow">
+    <h2>Workflow System</h2>
+    <p class="section-subtitle">Multi-step approval chain for form publishing — gated by feature.workflow.enabled</p>
+
+    <h3>Flow</h3>
+    <div class="flow">
+      <div class="flow-row">
+        <div class="flow-box blue">Builder saves form (DRAFT)</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box amber">POST /workflows/initiate (sets approval chain)</div>
+      </div>
+      <div class="flow-row" style="margin-top:8px;">
+        <div class="flow-box">status → PENDING_PUBLISH</div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-box purple">Approver N decides step</div>
+      </div>
+      <div class="flow-row" style="margin-top:8px;">
+        <div class="flow-box green">All approved → PUBLISHED</div>
+        <div class="flow-arrow"> | </div>
+        <div class="flow-box red">Any rejected → REJECTED</div>
+      </div>
+    </div>
+
+    <h3>Frontend: Approvals Pages</h3>
+    <ul>
+      <li><code>/approvals</code> — Shows pending steps for the current user (approve/reject actions)</li>
+      <li><code>/approvals/history</code> — Historical view of all handled workflows</li>
+    </ul>
+
+    <h3>Level Up System</h3>
+    <p>A <code>USER</code> role user can request promotion to <code>BUILDER</code> role via <code>POST /level-up/request</code>. An ADMIN reviews pending requests at <code>GET /level-up/pending</code> and decides via <code>POST /level-up/{id}/decide</code>. On APPROVE, the BUILDER role is globally assigned via <code>RoleService.assignRole()</code>.</p>
+  </section>
+
+  <section id="limits">
+    <h2>System Limits & Guardrails</h2>
+    <p class="section-subtitle">Configured in application.properties and enforced in FormService/SubmissionService</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Limit</th><th>Value</th><th>Where Enforced</th></tr></thead>
+        <tbody>
+          <tr><td>Max fields per form</td><td>50</td><td>FormService (on save)</td></tr>
+          <tr><td>Max validations per form</td><td>100</td><td>FormService (on save)</td></tr>
+          <tr><td>Max pages/sections per form</td><td>10</td><td>FormService (on save)</td></tr>
+          <tr><td>Max submission payload</td><td>100 KB</td><td>SubmissionService (on submit)</td></tr>
+          <tr><td>Max file upload size</td><td>5 MB / 10 MB request</td><td>Spring Multipart config</td></tr>
+          <tr><td>Session timeout</td><td>15 minutes</td><td>Spring Security</td></tr>
+          <tr><td>Max concurrent sessions</td><td>1 per user</td><td>Spring Security SessionRegistry</td></tr>
+          <tr><td>Form code max length</td><td>100 chars</td><td>FormService regex validation</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- FRONTEND -->
+  <section id="frontend-structure">
+    <h2>Frontend App Structure</h2>
+    <p class="section-subtitle">Next.js 14 App Router · TypeScript · Tailwind CSS</p>
+
+    <div class="code-block">src/
+├── <span class="type">app/</span>                         <span class="comment">// Next.js App Router pages</span>
+│   ├── page.tsx                <span class="comment">// Dashboard — form list + stats cards</span>
+│   ├── layout.tsx              <span class="comment">// Root layout (fonts, providers)</span>
+│   ├── globals.css             <span class="comment">// CSS variables theme system</span>
+│   ├── login/page.tsx          <span class="comment">// Login form</span>
+│   ├── register/page.tsx       <span class="comment">// Self-registration</span>
+│   ├── profile/page.tsx        <span class="comment">// Password change, level-up request</span>
+│   ├── builder/page.tsx        <span class="comment">// Drag-and-drop form builder</span>
+│   ├── builder/preview/page.tsx <span class="comment">// Live form preview</span>
+│   ├── f/[token]/page.tsx      <span class="comment">// Public form fill page</span>
+│   ├── forms/
+│   │   ├── status/page.tsx     <span class="comment">// Form status overview</span>
+│   │   └── [id]/responses/page.tsx <span class="comment">// Submissions viewer/manager</span>
+│   ├── approvals/page.tsx      <span class="comment">// Workflow approval queue</span>
+│   ├── approvals/history/page.tsx
+│   └── admin/
+│       ├── layout.tsx
+│       ├── users/page.tsx      <span class="comment">// User management</span>
+│       ├── users/[id]/page.tsx <span class="comment">// User detail + role assignments</span>
+│       ├── roles/page.tsx      <span class="comment">// Role + permission management</span>
+│       ├── modules/page.tsx    <span class="comment">// Module management</span>
+│       ├── role-modules/page.tsx <span class="comment">// Role↔Module assignment</span>
+│       └── audit/page.tsx      <span class="comment">// Audit log viewer</span>
+├── <span class="type">components/</span>
+│   ├── FormRenderer.tsx        <span class="comment">// Public form fill renderer (~65KB — largest file)</span>
+│   ├── Header.tsx              <span class="comment">// Top navigation bar</span>
+│   ├── Sidebar.tsx             <span class="comment">// Left nav sidebar (auth-aware)</span>
+│   ├── RouteGuard.tsx          <span class="comment">// Redirects unauthenticated users</span>
+│   ├── AccessDenied.tsx        <span class="comment">// Permission denied UI component</span>
+│   ├── AppShell.tsx            <span class="comment">// Layout wrapper with Header+Sidebar</span>
+│   ├── ThemeToggle.tsx         <span class="comment">// Light/dark mode toggle</span>
+│   ├── SubmissionDetailDrawer.tsx <span class="comment">// Slide-out for single submission detail</span>
+│   └── builder/
+│       ├── Canvas.tsx          <span class="comment">// Drop zone for form fields</span>
+│       ├── Sidebar.tsx         <span class="comment">// Field type palette (drag sources)</span>
+│       ├── SortableField.tsx   <span class="comment">// Draggable field card</span>
+│       ├── PropertiesPanel.tsx <span class="comment">// Field properties editor (~40KB)</span>
+│       ├── LogicPanel.tsx      <span class="comment">// IF→THEN rule builder UI</span>
+│       ├── CustomValidationsPanel.tsx <span class="comment">// Expression-based validation rules</span>
+│       ├── VersionsPanel.tsx   <span class="comment">// Version history sidebar</span>
+│       └── DraggableSidebarBtn.tsx <span class="comment">// Drag source button</span>
+├── <span class="type">hooks/</span>
+│   └── usePermissions.ts       <span class="comment">// Fetches + caches user permissions (5min TTL)</span>
+├── <span class="type">services/</span>
+│   └── api.ts                  <span class="comment">// All HTTP client functions</span>
+├── <span class="type">store/</span>
+│   ├── useFormStore.ts         <span class="comment">// Zustand: builder state (schema, selectedField)</span>
+│   └── useUIStore.ts           <span class="comment">// Zustand: UI state (sidebar open/close)</span>
+├── <span class="type">types/</span>
+│   └── schema.ts               <span class="comment">// All TS types — single source of truth</span>
+└── <span class="type">utils/</span>
+    ├── apiConstants.ts         <span class="comment">// All endpoint URL constants</span>
+    ├── apiData.ts              <span class="comment">// extractArray() helper</span>
+    ├── codeValidation.ts       <span class="comment">// Frontend form code validation</span>
+    ├── error-handler.ts        <span class="comment">// extractApiError() — parses backend ErrorResponseDTO</span>
+    ├── expressionValidator.ts  <span class="comment">// Client-side expression syntax checker</span>
+    └── sanitization.ts         <span class="comment">// Input sanitization helpers</span></div>
+  </section>
+
+  <section id="pages">
+    <h2>Pages & Routes</h2>
+    <p class="section-subtitle">All frontend routes and their purpose</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Route</th><th>Auth</th><th>Purpose</th><th>Key Features</th></tr></thead>
+        <tbody>
+          <tr><td>/</td><td>Yes</td><td>Dashboard</td><td>Form cards (grid/list view), stats (total/published/draft/submissions), archive/restore, share link copy</td></tr>
+          <tr><td>/login</td><td>No</td><td>Login</td><td>Username+password, redirect to / on success</td></tr>
+          <tr><td>/register</td><td>No</td><td>Self-register</td><td>Creates USER role account</td></tr>
+          <tr><td>/profile</td><td>Yes</td><td>Profile</td><td>Change password, request Level Up (USER→BUILDER)</td></tr>
+          <tr><td>/builder</td><td>Yes (WRITE)</td><td>Form Builder</td><td>dnd-kit drag/drop, field types, logic rules, custom validations, version history, workflow initiation, theme customisation</td></tr>
+          <tr><td>/builder/preview</td><td>Yes</td><td>Preview</td><td>Live FormRenderer preview with test submission</td></tr>
+          <tr><td>/f/[token]</td><td>No</td><td>Public Form</td><td>Token-resolved form fill, draft save, edit existing response if allowEditResponse</td></tr>
+          <tr><td>/forms/status</td><td>Yes</td><td>Status Board</td><td>Overview of all forms with status indicators</td></tr>
+          <tr><td>/forms/[id]/responses</td><td>Yes (READ)</td><td>Responses</td><td>Paginated table, sort/filter, bulk delete/status-update, CSV export, submission detail drawer</td></tr>
+          <tr><td>/approvals</td><td>Yes (APPROVE)</td><td>Approval Queue</td><td>Pending workflow steps, approve/reject with comments</td></tr>
+          <tr><td>/approvals/history</td><td>Yes</td><td>Approval History</td><td>Past workflow decisions</td></tr>
+          <tr><td>/admin/users</td><td>MANAGE</td><td>User Admin</td><td>Create/delete users, view list</td></tr>
+          <tr><td>/admin/users/[id]</td><td>MANAGE</td><td>User Detail</td><td>Assign/remove roles per user</td></tr>
+          <tr><td>/admin/roles</td><td>MANAGE</td><td>Role Admin</td><td>CRUD roles, assign permissions</td></tr>
+          <tr><td>/admin/modules</td><td>MANAGE</td><td>Module Admin</td><td>Navigation module CRUD</td></tr>
+          <tr><td>/admin/role-modules</td><td>MANAGE</td><td>Role-Module</td><td>Assign modules to roles</td></tr>
+          <tr><td>/admin/audit</td><td>AUDIT</td><td>Audit Logs</td><td>Paginated audit log with filter</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <section id="builder">
+    <h2>Form Builder</h2>
+    <p class="section-subtitle">The core drag-and-drop editor — /builder?id={formId}</p>
+
+    <h3>Panel Layout</h3>
+    <div class="flow">
+      <div class="flow-row">
+        <div class="flow-box blue">Left: Field Palette (Sidebar)</div>
+        <div class="flow-arrow"> | </div>
+        <div class="flow-box green">Center: Canvas / LogicPanel / ValidationPanel / VersionPanel</div>
+        <div class="flow-arrow"> | </div>
+        <div class="flow-box amber">Right: PropertiesPanel</div>
+      </div>
+    </div>
+
+    <h3>Supported Field Types (21)</h3>
+    <div class="pill-list">
+      <span class="pill">TEXT</span><span class="pill">TEXTAREA</span><span class="pill">NUMERIC</span>
+      <span class="pill">DATE</span><span class="pill">DATE_TIME</span><span class="pill">TIME</span>
+      <span class="pill">BOOLEAN</span><span class="pill">DROPDOWN</span><span class="pill">RADIO</span>
+      <span class="pill">CHECKBOX_GROUP</span><span class="pill">RATING</span><span class="pill">SCALE</span>
+      <span class="pill">FILE</span><span class="pill">GRID_RADIO</span><span class="pill">GRID_CHECK</span>
+      <span class="pill">LOOKUP</span><span class="pill">CALCULATED</span><span class="pill">SECTION_HEADER</span>
+      <span class="pill">INFO_LABEL</span><span class="pill">PAGE_BREAK</span><span class="pill">HIDDEN</span>
+    </div>
+
+    <h3>Builder Tabs</h3>
+    <ul>
+      <li><strong>EDITOR</strong> — Canvas + PropertiesPanel + Sidebar field palette</li>
+      <li><strong>LOGIC</strong> — LogicPanel: build IF→THEN rules with nested conditions</li>
+      <li><strong>VALIDATIONS</strong> — CustomValidationsPanel: expression-based server-side validations</li>
+      <li><strong>VERSIONS</strong> — VersionsPanel: view history, restore previous versions</li>
+    </ul>
+
+    <h3>Auto-derived columnName</h3>
+    <p>When a field label changes, <code>useFormStore.updateField()</code> auto-derives the <code>columnName</code> as snake_case (e.g. "First Name" → <code>first_name</code>). All existing rules referencing the old name are automatically updated in the store to prevent broken logic.</p>
+
+    <h3>Drag-and-Drop (dnd-kit)</h3>
+    <p>Uses <code>DndContext</code> with <code>PointerSensor</code> and <code>closestCorners</code> collision detection. Dragging from Sidebar (new field) and reordering on Canvas (existing fields) are handled separately in <code>handleDragEnd</code>. Nested fields (children of SECTION_HEADER) have their own sortable context.</p>
+  </section>
+
+  <section id="components">
+    <h2>Key Components</h2>
+    <p class="section-subtitle">Non-page reusable components</p>
+
+    <h3>FormRenderer.tsx (~65KB — largest file)</h3>
+    <p>The universal form fill component. Used in <code>/f/[token]</code> (public) and <code>/builder/preview</code>. Renders all 21 field types, evaluates SHOW/HIDE/REQUIRE/ENABLE/DISABLE rules client-side, handles draft saving, and manages multi-page navigation via PAGE_BREAK fields.</p>
+
+    <h3>PropertiesPanel.tsx (~40KB)</h3>
+    <p>The right panel in the builder. Shows different controls for each field type: options editor (Dropdown/Radio/Checkbox), grid row/col editor, lookup config, calculation formula input, validation constraints (min/max/pattern/minLength/maxLength), and toggle flags (required, readonly, hidden, disabled, multiselect).</p>
+
+    <h3>RouteGuard.tsx</h3>
+    <p>Wraps protected pages. Calls <code>GET /auth/me</code> on mount. Redirects to <code>/login</code> if 401. Passes through if authenticated. Does not check specific permissions — that is done by <code>usePermissions</code> inside each page.</p>
+
+    <h3>Sidebar.tsx (app-level)</h3>
+    <p>The left navigation sidebar. Renders modules fetched from <code>GET /menu</code> based on the user's role-module assignments. Includes user info and logout button. Collapses on mobile.</p>
+  </section>
+
+  <section id="state">
+    <h2>State Management</h2>
+    <p class="section-subtitle">Zustand stores — no Redux, no Context API</p>
+
+    <h3>useFormStore</h3>
+    <p>The single source of truth for the entire builder. Key state:</p>
+    <ul>
+      <li><code>schema: FormSchema</code> — full form including title, code, fields[], rules[], formValidations[]</li>
+      <li><code>selectedFieldId: string | null</code> — which field card is selected (drives PropertiesPanel)</li>
+      <li><code>isThemePanelOpen: boolean</code></li>
+    </ul>
+    <p>Key actions: <code>addField</code>, <code>updateField</code> (with auto-columnName + rule update), <code>removeField</code>, <code>reorderFields</code>, <code>addRule</code>, <code>updateRule</code>, <code>deleteRule</code>, <code>setFormValidations</code>.</p>
+    <p>Uses recursive <code>updateFieldInTree()</code> for nested children fields.</p>
+
+    <h3>useUIStore</h3>
+    <p>Simple store: <code>isSidebarOpen: boolean</code>. Controls the collapsible sidebar state.</p>
+
+    <h3>usePermissions hook</h3>
+    <p>Not Zustand — uses React state + module-level cache. Fetches <code>GET /auth/permissions</code> and caches the result for 5 minutes. Provides <code>hasPermission(permission, formId?)</code> for component-level permission checks. Used on almost every protected page to show/hide action buttons.</p>
+  </section>
+
+  <section id="permissions">
+    <h2>Permission System</h2>
+    <p class="section-subtitle">RBAC — Role → Permission matrix</p>
+
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Role</th><th>Permissions</th><th>Can Access</th></tr></thead>
+        <tbody>
+          <tr>
+            <td>ADMIN / ROLE_ADMIN</td>
+            <td>MANAGE, READ, WRITE, EDIT, AUDIT, DELETE, EXPORT, APPROVE, VISIBILITY</td>
+            <td>Everything</td>
+          </tr>
+          <tr>
+            <td>BUILDER</td>
+            <td>READ, WRITE, EDIT, DELETE, EXPORT (configurable)</td>
+            <td>Form builder, responses, approvals</td>
+          </tr>
+          <tr>
+            <td>USER</td>
+            <td>READ (configurable)</td>
+            <td>Submit forms, request level-up</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout info">
+      <span class="callout-icon">ℹ️</span>
+      <span class="callout-body"><code>user_form_roles.form_id</code> can be NULL (global role) or set to a specific form UUID (scoped role). The frontend <code>hasPermission(perm, formId)</code> checks both global assignments and form-scoped ones.</span>
+    </div>
+  </section>
+
+  <!-- ═══════════ IMPROVEMENTS ═══════════ -->
+  <section id="bugs">
+    <h2>Bug Fixes</h2>
+    <p class="section-subtitle">Issues found that cause incorrect behavior</p>
+
+    <div class="suggestion">
+      <div class="suggestion-header">
+        <span class="sug-badge bug">Bug</span>
+        <span class="suggestion-title">Duplicate validateFormCode() logic — inconsistent reserved keyword check</span>
+      </div>
+      <div class="suggestion-body">
+        <code>FormService</code> defines two nearly-identical overloads of <code>validateFormCode()</code>. Both duplicate the regex check and SQL keyword validation. If one is updated the other may not be. <strong>Fix:</strong> Extract the shared validation into a private <code>assertCodeFormat(String code)</code> method and call it from both overloads.
+      </div>
+    </div>
+
+    <div class="suggestion">
+      <div class="suggestion-header">
+        <span class="sug-badge bug">Bug</span>
+        <span class="suggestion-title">console.log left in production code (api.ts)</span>
+      </div>
+      <div class="suggestion-body">
+        <code>api.ts</code> in <code>saveForm()</code> has: <code>console.log("SENDING PAYLOAD TO DB:", ...)</code>. This logs the entire form rules JSON to the browser console in production, leaking internal schema. <strong>Fix:</strong> Remove or gate behind a <code>process.env.NODE_ENV === 'development'</code> check.
+      </div>
+    </div>
+
+    <div class="suggestion">
+      <div class="suggestion-header">
+        <span class="sug-badge bug">Bug</span>
+        <span class="suggestion-title">FormSchema.id typed as number but backend uses UUID</span>
+      </div>
+      <div class="suggestion-body">
+        In <code>schema.ts</code>, <code>FormSchema.id</code> is typed <code>number</code>, but the backend returns a UUID string. Similarly <code>FormSummary.id</code> in <code>page.tsx</code> is <code>number</code>. This works only because JavaScript is loose with string/number coercion in URL building, but TypeScript throws no warning. <strong>Fix:</strong> Change <code>id: number</code> to <code>id: string</code> everywhere in frontend types.
+      </div>
+    </div>
+
+    <div class="suggestion">
+      <div class="suggestion-header">
+        <span class="sug-badge bug">Bug</span>
+        <span class="suggestion-title">WorkflowController catches RuntimeException for auth errors instead of using @ResponseStatus</span>
+      </div>
+      <div class="suggestion-body">
+        The <code>approve()</code> endpoint catches <code>RuntimeException</code> and manually checks <code>message.contains("Unauthorized")</code> to return 403. This is fragile — a message change silently breaks authorization. <strong>Fix:</strong> Throw a typed exception (e.g. <code>AccessDeniedException</code>) from <code>WorkflowService</code> and let <code>GlobalExceptionHandler</code> handle it with a 403 response.
+      </div>
+    </div>
+
+    <div class="suggestion">
+      <div class="suggestion-header">
+        <span class="sug-badge bug">Bug</span>
+        <span class="suggestion-title">hardDeleteForm uses System.err.println instead of proper logging</span>
+      </div>
+      <div class="suggestion-body">
+        <code>FormController.hardDeleteForm()</code> catches exceptions with <code>System.err.println()</code> and <code>e.printStackTrace()</code>. These bypass the logging framework and won't appear in structured log output. <strong>Fix:</strong> Replace with <code>log.error("Permanent delete failed for form {}: {}", id, e.getMessage(), e)</code> using SLF4J.
+      </div>
+    </div>
+
+    <div class="suggestion">
+      <div class="suggestion-header">
+        <span class="sug-badge bug">Bug</span>
+        <span class="suggestion-title">Timestamp timezone inconsistency across schema</span>
+      </div>
+      <div class="suggestion-body">
+        <code>users</code>, <code>audit_logs</code>, <code>workflow_instances/steps</code>, and <code>level_up_requests</code> use <code>TIMESTAMP WITHOUT TIME ZONE</code>, while <code>forms</code>, <code>form_versions</code>, and <code>form_submission_meta</code> use <code>TIMESTAMP WITH TIME ZONE</code>. This causes silent timezone conversion bugs when comparing timestamps across tables. <strong>Fix:</strong> Migrate all timestamp columns to <code>TIMESTAMP WITH TIME ZONE</code>.
+      </div>
+    </div>
+  </section>
+
+  <section id="qol">
+    <h2>Quality of Life Improvements</h2>
+    <p class="section-subtitle">Not breaking, but would meaningfully improve developer or user experience</p>
+
+    <div class="suggestion">
+      <div class="suggestion-header">
+        <span class="sug-badge qol">QoL</span>
+        <span class="suggestion-title">Add SLF4J logging throughout the backend services</span>
+      </div>
+      <div class="suggestion-body">
+        The backend currently has zero structured logging in services. All debug output uses <code>System.err.println()</code> (found in 3 places) or nothing. <strong>Recommendation:</strong> Add <code>@Slf4j</code> (Lombok annotation) to all services and replace println calls. Log at DEBUG for happy path, WARN for business rule violations, ERROR for unexpected exceptions. This is essential for production debugging.
+      </div>
+    </div>
+
+    <div class="suggestion">
+      <div class="suggestion-header">
+        <span class="sug-badge qol">QoL</span>
+        <span class="suggestion-title">Extract API_SERVER to environment variable in frontend</span>
+      </div>
+      <div class="suggestion-body">
+        <code>apiConstants.ts</code> hardcodes <code>const API_SERVER = 'http://localhost:8080'</code>. Deploying to any environment requires code changes. <strong>Fix:</strong> Change to <code>const API_SERVER = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8080'</code> and add <code>NEXT_PUBLIC_API_URL</code> to <code>.env.local</code> and deployment configs.
+      </div>
+    </div>
+
+    <div class="suggestion">
+      <div class="suggestion-header">
+        <span class="sug-badge qol">QoL</span>
+        <span class="suggestion-title">Add database indexes for frequently-queried columns</span>
+      </div>
+      <div class="suggestion-body">
+        The schema has no explicit indexes beyond PKs and unique constraints. High-frequency queries that would benefit from indexes: <strong><code>form_submission_meta(form_id)</code></strong>, <strong><code>workflow_instances(creator_id)</code></strong>, <strong><code>workflow_steps(instance_id, status)</code></strong>, <strong><code>audit_logs(actor, created_at)</code></strong>, <strong><code>user_form_roles(user_id)</code></strong>. Add these to <code>schema.sql</code>.
+      </div>
+    </div>
+
+    <div class="suggestion">
+      <div class="suggestion-header">
+        <span class="sug-badge qol">QoL</span>
+        <span class="suggestion-title">usePermissions cache should survive page navigation</span>
+      </div>
+      <div class="suggestion-body">
+        The <code>permissionsCache</code> in <code>usePermissions.ts</code> is a module-level variable — it persists across component mounts but is reset on full page reload. Every page currently calls <code>usePermissions()</code> independently, causing a waterfall of permission checks on initial load. <strong>Recommendation:</strong> Lift the permission state into a React Context provider at the app root so it is fetched once and shared across all pages without re-fetching.
+      </div>
+    </div>
+
+    <div class="suggestion">
+      <div class="suggestion-header">
+        <span class="sug-badge qol">QoL</span>
+        <span class="suggestion-title">FormRenderer is a 65KB monolith — split by field type</span>
+      </div>
+      <div class="suggestion-body">
+        <code>FormRenderer.tsx</code> at ~65KB is the largest file in the project and handles rendering for all 21 field types, rule evaluation, pagination, draft saving, and file uploads in one component. This makes it hard to test and maintain. <strong>Recommendation:</strong> Extract each field type into a <code>fields/</code> subfolder (e.g. <code>fields/TextField.tsx</code>, <code>fields/GridField.tsx</code>) and keep <code>FormRenderer.tsx</code> as an orchestrator. Similarly PropertiesPanel (40KB) should be split by field type sections.
+      </div>
+    </div>
+
+    <div class="suggestion">
+      <div class="suggestion-header">
+        <span class="sug-badge qol">QoL</span>
+        <span class="suggestion-title">Add migration scripts folder instead of drop-and-recreate</span>
+      </div>
+      <div class="suggestion-body">
+        Currently the only way to update the schema is to run <code>unseed.sql</code> then <code>schema.sql</code> again — destroying all data. <strong>Recommendation:</strong> Adopt Flyway or Liquibase. Add a <code>sql/migrations/</code> folder with numbered scripts (e.g. <code>V1__initial_schema.sql</code>, <code>V2__add_indexes.sql</code>). This is critical before going to production with real data.
+      </div>
+    </div>
+
+    <div class="suggestion">
+      <div class="suggestion-header">
+        <span class="sug-badge qol">QoL</span>
+        <span class="suggestion-title">seeder.sql and README reference different role/user names</span>
+      </div>
+      <div class="suggestion-body">
+        The README documents roles as ADMIN, MENTOR, INTERN and users as mentor1/intern1. The actual <code>seeder.sql</code> seeds ADMIN, ROLE_ADMIN, USER, BUILDER with only one user (<code>admin</code>). The README is stale. <strong>Fix:</strong> Update README to reflect actual seeder contents. Optionally add a proper <code>mock_users_seeder</code> with diverse test accounts per role.
+      </div>
+    </div>
+  </section>
+
+  <section id="security-issues">
+    <h2>Security Issues</h2>
+    <p class="section-subtitle">Items requiring attention before production deployment</p>
+
+    <div class="suggestion">
+      <div class="suggestion-header">
+        <span class="sug-badge security">Security</span>
+        <span class="suggestion-title">CRITICAL: SMTP password hardcoded in application.properties</span>
+      </div>
+      <div class="suggestion-body">
+        <code>application.properties</code> contains a real Gmail app password: <code>spring.mail.password=hoid kail kuoy hdod</code>. This is committed to source control and visible to anyone with repo access. <strong>Fix immediately:</strong> Move to <code>SPRING_MAIL_PASSWORD</code> environment variable. Use <code>${SPRING_MAIL_PASSWORD}</code> in properties. Add <code>application.properties</code> to <code>.gitignore</code> and use <code>application.properties.example</code> instead.
+      </div>
+    </div>
+
+    <div class="suggestion">
+      <div class="suggestion-header">
+        <span class="sug-badge security">Security</span>
+        <span class="suggestion-title">DB password hardcoded: spring.datasource.password=root</span>
+      </div>
+      <div class="suggestion-body">
+        Same issue — the database password <code>root</code> is hardcoded. Move to <code>SPRING_DATASOURCE_PASSWORD</code> env var. For production, use a strong random password and restrict the PostgreSQL user to only the formbuilder2 database.
+      </div>
+    </div>
+
+    <div class="suggestion">
+      <div class="suggestion-header">
+        <span class="sug-badge security">Security</span>
+        <span class="suggestion-title">File upload endpoint is fully public with no auth</span>
+      </div>
+      <div class="suggestion-body">
+        <code>/api/v1/upload</code> and <code>/api/v1/files/**</code> are in the <code>permitAll()</code> list. Anyone on the internet can upload files or enumerate/download uploaded files without any authentication. <strong>Fix:</strong> Require authentication for upload. For file access, validate that the requesting user has access to the form the file belongs to, or use time-limited signed URLs.
+      </div>
+    </div>
+
+    <div class="suggestion">
+      <div class="suggestion-header">
+        <span class="sug-badge security">Security</span>
+        <span class="suggestion-title">CORS allows only localhost:3000 — needs environment config</span>
+      </div>
+      <div class="suggestion-body">
+        <code>SecurityConfig</code> hardcodes <code>allowedOrigins("http://localhost:3000")</code>. In production this needs to be the actual frontend domain. <strong>Fix:</strong> Move to <code>CORS_ALLOWED_ORIGINS</code> environment variable: <code>configuration.setAllowedOrigins(Arrays.asList(corsAllowedOrigins.split(",")))</code>.
+      </div>
+    </div>
+  </section>
+
+  <section id="unused">
+    <h2>Unused / Underused Code</h2>
+    <p class="section-subtitle">Things found that currently add no value, or could add value if wired up</p>
+
+    <div class="suggestion">
+      <div class="suggestion-header">
+        <span class="sug-badge unused">Unused</span>
+        <span class="suggestion-title">system_configurations table — exists but nothing reads it</span>
+      </div>
+      <div class="suggestion-body">
+        Table #17 <code>system_configurations</code> has a repository (<code>SystemConfigurationRepository</code>) and an entity, but no service or controller uses it. <strong>Suggestion to use:</strong> This is a perfect place to store configurable settings currently hardcoded in <code>application.properties</code> — max fields per form, session timeout, allowed file types — making them adjustable at runtime via an admin UI without redeploy.
+      </div>
+    </div>
+
+    <div class="suggestion">
+      <div class="suggestion-header">
+        <span class="sug-badge unused">Unused</span>
+        <span class="suggestion-title">roles.parent_role_id — hierarchy defined but never traversed</span>
+      </div>
+      <div class="suggestion-body">
+        The <code>roles</code> table has a <code>parent_role_id</code> self-referencing FK enabling hierarchical roles. No service currently traverses this hierarchy — permissions are checked only on the direct role. <strong>Suggestion:</strong> If you want BUILDER to inherit USER permissions automatically, implement permission resolution that walks the parent chain. Otherwise, remove the column to keep the schema clean.
+      </div>
+    </div>
+
+    <div class="suggestion">
+      <div class="suggestion-header">
+        <span class="sug-badge unused">Unused</span>
+        <span class="suggestion-title">permissions.feature_id — all rows have 'ALL', never scoped</span>
+      </div>
+      <div class="suggestion-body">
+        Every seeded permission has <code>feature_id = 'ALL'</code>. The column was presumably intended to scope permissions to specific features (e.g. only the forms module). Since it's never used for filtering, it adds confusion. <strong>Suggestion:</strong> Either implement feature-scoped permission checks or remove the column. If keeping it, document its intended use.
+      </div>
+    </div>
+
+    <div class="suggestion">
+      <div class="suggestion-header">
+        <span class="sug-badge unused">Unused</span>
+        <span class="suggestion-title">DraftService — separate service but minimal use</span>
+      </div>
+      <div class="suggestion-body">
+        <code>DraftService.java</code> exists as its own service but has minimal functionality. Draft saving is largely handled inside <code>SubmissionService</code> via the <code>is_draft</code> flag and <code>status='RESPONSE_DRAFT'</code>. <strong>Suggestion:</strong> Consolidate draft logic fully into <code>SubmissionService</code> and remove the thin <code>DraftService</code> to reduce confusion about which service handles drafts.
+      </div>
+    </div>
+
+    <div class="suggestion">
+      <div class="suggestion-header">
+        <span class="sug-badge unused">Unused</span>
+        <span class="suggestion-title">forms.issued_by_username — column with no clear owner</span>
+      </div>
+      <div class="suggestion-body">
+        The <code>forms</code> table has both <code>creator_id</code> (FK to users), <code>created_by</code> (VARCHAR username), and <code>issued_by_username</code> (VARCHAR). Three fields capturing similar provenance information creates confusion about which one is authoritative. <strong>Suggestion:</strong> Standardize on <code>creator_id</code> (the FK) and remove the redundant VARCHAR columns, or at least document each field's distinct meaning.
+      </div>
+    </div>
+
+    <div class="suggestion">
+      <div class="suggestion-header">
+        <span class="sug-badge unused">Unused</span>
+        <span class="suggestion-title">useUIStore — only one boolean, consider removing</span>
+      </div>
+      <div class="suggestion-body">
+        <code>useUIStore.ts</code> contains a single <code>isSidebarOpen</code> boolean. This is so minimal it could just be local <code>useState</code> in the layout component, or merged into the main store. The separate store adds indirection for little benefit. <strong>Suggestion:</strong> Move to <code>useState</code> in the sidebar component or add more UI state to justify keeping it as a dedicated store.
+      </div>
+    </div>
+  </section>
+
+  <section id="perf">
+    <h2>Performance Improvements</h2>
+    <p class="section-subtitle">Opportunities to improve speed and efficiency</p>
+
+    <div class="suggestion">
+      <div class="suggestion-header">
+        <span class="sug-badge perf">Perf</span>
+        <span class="suggestion-title">spring.jpa.show-sql=true should be disabled in production</span>
+      </div>
+      <div class="suggestion-body">
+        <code>application.properties</code> has <code>spring.jpa.show-sql=true</code> and <code>hibernate.format_sql=true</code>. This logs every SQL query to the console, causing significant I/O overhead in production. <strong>Fix:</strong> Set <code>spring.jpa.show-sql=false</code> and only enable it in a dev profile (<code>application-dev.properties</code>).
+      </div>
+    </div>
+
+    <div class="suggestion">
+      <div class="suggestion-header">
+        <span class="sug-badge perf">Perf</span>
+        <span class="suggestion-title">No N+1 guard on WorkflowController.mapInstanceToDetailedMap()</span>
+      </div>
+      <div class="suggestion-body">
+        <code>mapInstanceToDetailedMap()</code> accesses <code>instance.getSteps()</code>, and inside each step accesses <code>s.getApprover().getUserFormRoles()</code>. If the LAZY-loaded collections aren't eagerly fetched in the query, this triggers N+1 queries per instance. With 50 workflow instances this could fire hundreds of queries. <strong>Fix:</strong> Add a JPQL query in <code>WorkflowInstanceRepository</code> with <code>JOIN FETCH</code> for steps and approver roles.
+      </div>
+    </div>
+
+    <div class="suggestion">
+      <div class="suggestion-header">
+        <span class="sug-badge perf">Perf</span>
+        <span class="suggestion-title">Dashboard fetches forms and stats in two separate sequential requests</span>
+      </div>
+      <div class="suggestion-body">
+        The dashboard page fires <code>GET /forms</code> and <code>GET /forms/stats</code> sequentially inside separate <code>useEffect</code> calls. <strong>Fix:</strong> Fire them in parallel with <code>Promise.all([fetchForms(), fetchStats()])</code>. This halves the perceived load time on the dashboard page.
+      </div>
+    </div>
+
+    <div class="suggestion">
+      <div class="suggestion-header">
+        <span class="sug-badge perf">Perf</span>
+        <span class="suggestion-title">CalculationService re-parses expressions on every evaluation</span>
+      </div>
+      <div class="suggestion-body">
+        <code>CalculationService</code> parses and evaluates calculation formulas on every form submission. If a form has many CALCULATED fields and receives high submission volume, this is wasteful. <strong>Suggestion:</strong> Cache parsed expression trees per <code>formVersionId + fieldKey</code> using a ConcurrentHashMap to avoid re-parsing identical formulas.
+      </div>
+    </div>
+  </section>
+
+  <hr>
+  <p style="color:var(--text3);font-size:13px;text-align:center;padding-bottom:40px;">
+    FormBuilder3 Internal Documentation · Generated April 2026 · com.sttl.formbuilder2
+  </p>
+
+</main>
+</div>
+
+<script>
+// Simple scroll spy
+const sections = document.querySelectorAll('section[id], div[id]');
+const navLinks = document.querySelectorAll('nav a');
+
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      navLinks.forEach(link => {
+        link.classList.remove('active');
+        if (link.getAttribute('href') === '#' + entry.target.id) {
+          link.classList.add('active');
+        }
+      });
+    }
+  });
+}, { rootMargin: '-30% 0px -60% 0px' });
+
+sections.forEach(s => observer.observe(s));
+</script>
+</body>
+</html>

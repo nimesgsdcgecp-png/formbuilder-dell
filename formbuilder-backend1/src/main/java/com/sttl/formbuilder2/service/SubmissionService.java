@@ -1,0 +1,679 @@
+package com.sttl.formbuilder2.service;
+
+import java.util.UUID;
+
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.sttl.formbuilder2.dto.internal.FormRuleDTO;
+import com.sttl.formbuilder2.model.entity.Form;
+import com.sttl.formbuilder2.model.entity.FormField;
+import com.sttl.formbuilder2.model.entity.FormVersion;
+import com.sttl.formbuilder2.repository.FormRepository;
+import com.sttl.formbuilder2.config.FormBuilderLimitsConfig;
+import lombok.RequiredArgsConstructor;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
+import java.time.LocalDateTime;
+import java.util.*;
+import java.util.stream.Collectors;
+
+/**
+ * SubmissionService — Business Logic for handling form submissions (Refactored)
+ */
+@Service
+@RequiredArgsConstructor
+public class SubmissionService {
+
+    private final FormRepository formRepository;
+    private final DynamicTableService dynamicTableService;
+    private final RuleEngineService ruleEngineService;
+    private final CalculationService calculationService;
+    private final ObjectMapper objectMapper;
+    private final com.sttl.formbuilder2.repository.FormVersionRepository formVersionRepository;
+    private final com.sttl.formbuilder2.repository.FieldValidationRepository fieldValidationRepository;
+    private final ExpressionEvaluatorService expressionEvaluatorService;
+    private final com.sttl.formbuilder2.repository.FormSubmissionMetaRepository formSubmissionMetaRepository;
+    private final FormBuilderLimitsConfig limitsConfig;
+
+    private String getCurrentUsername() {
+        try {
+            org.springframework.security.core.Authentication auth = org.springframework.security.core.context.SecurityContextHolder
+                    .getContext().getAuthentication();
+            if (auth != null && auth.isAuthenticated()
+                    && !(auth instanceof org.springframework.security.authentication.AnonymousAuthenticationToken)) {
+                return auth.getName();
+            }
+        } catch (Exception ignored) {
+        }
+        return "Anonymous";
+    }
+
+    @Transactional
+    public UUID submitData(UUID formId, Map<String, Object> data, UUID formVersionId, String status) {
+        Form form = formRepository.findById(formId)
+                .orElseThrow(() -> new RuntimeException("Form not found"));
+
+        if (form.getStatus() != com.sttl.formbuilder2.model.enums.FormStatus.PUBLISHED) {
+            throw new org.springframework.web.server.ResponseStatusException(
+                    org.springframework.http.HttpStatus.FORBIDDEN, "Submission failed: Form is not published.");
+        }
+
+        // Section 10: Payload Size Check (100 KB)
+        try {
+            byte[] bytes = objectMapper.writeValueAsBytes(data);
+            if (bytes.length > limitsConfig.getMaxPayloadSizeKb() * 1024) {
+                 throw new com.sttl.formbuilder2.exception.FormBuilderException("LIMIT_EXCEEDED",
+                    "Submission payload size exceeds limit of " + limitsConfig.getMaxPayloadSizeKb() + " KB. Current: " + (bytes.length / 1024) + " KB");
+            }
+        } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+            // Ignore - fallback to standard flow
+        }
+
+        FormVersion activeVersion = formVersionRepository.findByFormIdAndIsActiveTrue(formId)
+            .orElseThrow(() -> new com.sttl.formbuilder2.exception.FormBuilderException("FORM_NOT_FOUND", "No active version found for this form"));
+
+        // Version Consistency Check
+        if (formVersionId != null && !activeVersion.getId().equals(formVersionId)) {
+            throw new com.sttl.formbuilder2.exception.FormBuilderException("VERSION_MISMATCH", 
+                "The form version has changed. Please refresh the page and try again.");
+        }
+
+        // Use the active version for everything below
+        FormVersion latestVersion = activeVersion; 
+
+        // Validate submission payload version id matches latest active if provided
+        if (data.containsKey("formVersionId")) {
+            try {
+                UUID payloadVersionId = UUID.fromString(data.get("formVersionId").toString());
+                if (!latestVersion.getId().equals(payloadVersionId)) {
+                    throw new com.sttl.formbuilder2.exception.FormBuilderException("VERSION_MISMATCH", "Form version has changed, please refresh the form.");
+                }
+            } catch (NumberFormatException ignored) {}
+        }
+
+        List<FormField> activeFields = latestVersion.getFields();
+
+        // 1. Run Evaluator Validations
+        java.util.List<com.sttl.formbuilder2.model.entity.FieldValidation> validations = fieldValidationRepository
+            .findByFormVersionIdOrderByExecutionOrder(latestVersion.getId());
+
+        java.util.List<com.sttl.formbuilder2.model.entity.FieldValidation> fieldValidations = validations.stream()
+            .filter(v -> "FIELD".equals(v.getScope())).collect(Collectors.toList());
+        java.util.List<com.sttl.formbuilder2.model.entity.FieldValidation> formValidations = validations.stream()
+            .filter(v -> "FORM".equals(v.getScope())).collect(Collectors.toList());
+
+        List<Map<String,String>> errors = new ArrayList<>();
+        
+        // 1a. Native JSON Validations (required, min, max, minLength, maxLength, pattern)
+        if (!"RESPONSE_DRAFT".equals(status)) {
+            for (FormField field : activeFields) {
+                Object val = data.get(field.getFieldKey());
+                boolean isBlank = (val == null || val.toString().trim().isEmpty());
+                
+                if (Boolean.TRUE.equals(field.getIsRequired()) && isBlank) {
+                    errors.add(Map.of("fieldKey", field.getFieldKey(), "message", field.getFieldLabel() + " is required."));
+                }
+                
+                if (!isBlank && field.getValidationRules() != null) {
+                    Map<String, Object> vr = field.getValidationRules();
+                    String strVal = (val == null) ? "" : val.toString();
+                    
+                    try {
+                        if (vr.containsKey("min") && vr.get("min") != null) {
+                            double min = Double.parseDouble(vr.get("min").toString());
+                            if (Double.parseDouble(strVal) < min) errors.add(Map.of("fieldKey", field.getFieldKey(), "message", "Must be >= " + min));
+                        }
+                        if (vr.containsKey("max") && vr.get("max") != null) {
+                            double max = Double.parseDouble(vr.get("max").toString());
+                            if (Double.parseDouble(strVal) > max) errors.add(Map.of("fieldKey", field.getFieldKey(), "message", "Must be <= " + max));
+                        }
+                    } catch(NumberFormatException ignored) {}
+                    
+                    if (vr.containsKey("minLength") && vr.get("minLength") != null) {
+                        int minL = Integer.parseInt(vr.get("minLength").toString());
+                        if (strVal.length() < minL) errors.add(Map.of("fieldKey", field.getFieldKey(), "message", "Minimum length is " + minL));
+                    }
+                    if (vr.containsKey("maxLength") && vr.get("maxLength") != null) {
+                        int maxL = Integer.parseInt(vr.get("maxLength").toString());
+                        if (strVal.length() > maxL) errors.add(Map.of("fieldKey", field.getFieldKey(), "message", "Maximum length is " + maxL));
+                    }
+                    if (vr.containsKey("pattern") && vr.get("pattern") != null) {
+                        String pat = vr.get("pattern").toString();
+                        if (!strVal.matches(pat)) errors.add(Map.of("fieldKey", field.getFieldKey(), "message", "Invalid format"));
+                    }
+                }
+
+
+            // 1b. AST Evaluator Validations (Field Scope)
+            for (com.sttl.formbuilder2.model.entity.FieldValidation fv : fieldValidations) {
+                boolean passed;
+                try {
+                    passed = expressionEvaluatorService.evaluate(fv.getExpression(), data, 
+                        fv.getId() != null ? fv.getId().toString() : "NEW", fv.getScope());
+                } catch (com.sttl.formbuilder2.exception.ExpressionEvaluationException e) {
+                    throw new com.sttl.formbuilder2.exception.FormBuilderException("EXPRESSION_EVAL_FAILED",
+                        String.format("Evaluation failed: %s [ID: %s, Context: %s]", e.getMessage(), e.getExpressionId(), e.getContext()), e);
+                }
+                if (!passed) {
+                    errors.add(Map.of("fieldKey", fv.getFieldKey(), "message", fv.getErrorMessage()));
+                }
+            }
+    
+            if (errors.isEmpty()) {
+                for (com.sttl.formbuilder2.model.entity.FieldValidation fv : formValidations) {
+                    boolean passed;
+                    try {
+                        passed = expressionEvaluatorService.evaluate(fv.getExpression(), data,
+                            fv.getId() != null ? fv.getId().toString() : "NEW", fv.getScope());
+                    } catch (com.sttl.formbuilder2.exception.ExpressionEvaluationException e) {
+                        throw new com.sttl.formbuilder2.exception.FormBuilderException("EXPRESSION_EVAL_FAILED",
+                            String.format("Evaluation failed: %s [ID: %s, Context: %s]", e.getMessage(), e.getExpressionId(), e.getContext()), e);
+                    }
+                    if (!passed) {
+                        errors.add(Map.of("fieldKey", "", "message", fv.getErrorMessage()));
+                    }
+                }
+            }
+    
+            if (!errors.isEmpty()) {
+                throw new com.sttl.formbuilder2.exception.ValidationFailedException("VALIDATION_ERROR", "Form validation failed", errors);
+            }
+    
+            // 1b. Run legacy IF-THEN Actions (RuleEngineService)
+            if (latestVersion.getRules() != null && !latestVersion.getRules().isBlank()) {
+                try {
+                    com.fasterxml.jackson.databind.JsonNode rootNode = objectMapper.readTree(latestVersion.getRules());
+                    List<FormRuleDTO> rules;
+                    if (rootNode.isArray()) {
+                        rules = objectMapper.convertValue(rootNode, new TypeReference<List<FormRuleDTO>>() {});
+                    } else if (rootNode.isObject() && rootNode.has("rules")) {
+                        rules = objectMapper.convertValue(rootNode.get("rules"), new TypeReference<List<FormRuleDTO>>() {});
+                    } else {
+                        rules = new ArrayList<>();
+                    }
+                    ruleEngineService.validateSubmission(rules, data);
+                } catch (org.springframework.web.server.ResponseStatusException e) {
+                    throw e; // Re-throw validation errors
+                } catch (Exception e) {
+                    System.err.println(">>> Rule Deserialization Error: " + e.getMessage());
+                }
+                }
+            }
+        }
+
+        // 2. Perform Calculations
+        calculationService.recalculateCalculatedFields(data, activeFields);
+
+        // 3. Prepare Metadata & Enforce Ownership/Unique Draft Rule (Section 5.1)
+        String currentUsername = getCurrentUsername();
+        UUID submissionId;
+        com.sttl.formbuilder2.model.entity.FormSubmissionMeta existingMeta = null;
+
+        if ("RESPONSE_DRAFT".equalsIgnoreCase(status)) {
+            existingMeta = formSubmissionMetaRepository.findByFormIdAndSubmittedByAndStatus(formId, currentUsername, "RESPONSE_DRAFT")
+                .filter(m -> !Boolean.TRUE.equals(m.getIsDeleted()))
+                .orElse(null);
+        }
+
+        if (existingMeta != null) {
+            // UPSERT: Update existing draft
+            submissionId = existingMeta.getSubmissionRowId();
+            data.put("updated_at", LocalDateTime.now());
+            data.put("submission_status", "RESPONSE_DRAFT");
+            dynamicTableService.updateData(form.getTargetTableName(), submissionId, data);
+            
+            existingMeta.setSubmittedAt(java.time.Instant.now());
+            formSubmissionMetaRepository.save(existingMeta);
+        } else {
+            // INSERT: New entry or new versioned submission
+            submissionId = UUID.randomUUID();
+            data.put("id", submissionId);
+            data.put("submitted_at", LocalDateTime.now());
+            data.put("updated_at", LocalDateTime.now());
+            data.put("submission_status", status != null ? status : "SUBMITTED");
+            data.put("form_version_id", latestVersion.getId());
+            data.put("is_draft", "RESPONSE_DRAFT".equalsIgnoreCase(status));
+            data.put("submitted_by", currentUsername);
+
+            dynamicTableService.insertData(form.getTargetTableName(), data);
+
+            com.sttl.formbuilder2.model.entity.FormSubmissionMeta meta = com.sttl.formbuilder2.model.entity.FormSubmissionMeta.builder()
+                .formId(form.getId())
+                .formVersionId(latestVersion.getId())
+                .submissionTable(form.getTargetTableName())
+                .submissionRowId(submissionId)
+                .status(status != null ? status : "SUBMITTED")
+                .submittedBy(currentUsername)
+                .submittedAt(java.time.Instant.now())
+                .build();
+            
+            try {
+                formSubmissionMetaRepository.save(meta);
+                
+                // TRIGGER POST-SUBMISSION WORKFLOWS (Rule Engine)
+                if (latestVersion.getRules() != null && !latestVersion.getRules().isBlank()) {
+                    try {
+                        com.fasterxml.jackson.databind.JsonNode rootNode = objectMapper.readTree(latestVersion.getRules());
+                        List<FormRuleDTO> rules;
+                        if (rootNode.isArray()) {
+                            rules = objectMapper.convertValue(rootNode, new TypeReference<List<FormRuleDTO>>() {});
+                        } else if (rootNode.isObject() && rootNode.has("logic")) {
+                            // Frontend sends logic: [] instead of rules: []
+                            rules = objectMapper.convertValue(rootNode.get("logic"), new TypeReference<List<FormRuleDTO>>() {});
+                        } else if (rootNode.isObject() && rootNode.has("rules")) {
+                            rules = objectMapper.convertValue(rootNode.get("rules"), new TypeReference<List<FormRuleDTO>>() {});
+                        } else {
+                            rules = new ArrayList<>();
+                        }
+                        ruleEngineService.executePostSubmissionWorkflows(rules, data);
+                    } catch (Exception e) {
+                        System.err.println(">>> [WORKFLOW ERROR] Failed to trigger rules: " + e.getMessage());
+                    }
+                }
+            } catch (org.springframework.dao.DataIntegrityViolationException e) {
+                // Section 5.2: Handle concurrent draft creation failure
+                if (e.getMessage() != null && e.getMessage().contains("idx_one_draft_per_user")) {
+                    throw new com.sttl.formbuilder2.exception.FormBuilderException("CONCURRENT_SUBMISSION_REJECTED", 
+                        "A draft is already being saved for this form. Please refresh.");
+                }
+                throw e;
+            }
+        }
+        
+        return submissionId;
+    }
+
+    /**
+     * SRS 6.2: Restore a soft-deleted submission
+     */
+    @Transactional
+    public void restoreSubmission(UUID formId, UUID submissionId) {
+        Form form = formRepository.findById(formId)
+                .orElseThrow(() -> new com.sttl.formbuilder2.exception.FormBuilderException("FORM_NOT_FOUND", "Form not found"));
+        
+        com.sttl.formbuilder2.model.entity.FormSubmissionMeta meta = formSubmissionMetaRepository.findBySubmissionRowId(submissionId)
+                .orElseThrow(() -> new com.sttl.formbuilder2.exception.FormBuilderException("SUBMISSION_NOT_FOUND", "Submission metadata not found"));
+
+        if (!meta.getFormId().equals(formId)) {
+            throw new com.sttl.formbuilder2.exception.FormBuilderException("INVALID_OPERATION", "Submission does not belong to the specified form.");
+        }
+
+        // Section 6.2: Restore Semantics (Treated as fully active, timestamps reflect restore time)
+        meta.setIsDeleted(false);
+        meta.setSubmittedAt(java.time.Instant.now()); 
+        formSubmissionMetaRepository.save(meta);
+
+        dynamicTableService.restoreRow(form.getTargetTableName(), submissionId);
+    }
+
+    @Transactional
+    public void restoreSubmissionsBulk(UUID formId, List<UUID> submissionIds) {
+        for (UUID id : submissionIds) {
+            restoreSubmission(formId, id);
+        }
+    }
+
+    @Transactional
+    public UUID submitDataByToken(String token, Map<String, Object> data, UUID formVersionId, String status) {
+        Form form = formRepository.findByPublicShareToken(token)
+                .or(() -> formRepository.findByCode(token))
+                .orElseThrow(() -> new com.sttl.formbuilder2.exception.FormBuilderException("FORM_NOT_FOUND", "Invalid share token or form code"));
+
+        if (form.getStatus() != com.sttl.formbuilder2.model.enums.FormStatus.PUBLISHED) {
+            boolean isOwner = form.getOwner() != null && form.getOwner().getUsername().equals(getCurrentUsername());
+            if (!isOwner) {
+                throw new com.sttl.formbuilder2.exception.FormBuilderException("FORBIDDEN", "Submission failed: Form is not published.");
+            }
+        }
+
+        return submitData(form.getId(), data, formVersionId, status);
+    }
+
+    public Map<String, Object> getSubmissions(UUID formId, int page, int size, String sortBy, String sortOrder,
+            Map<String, String> filters) {
+        Form form = formRepository.findById(formId)
+                .orElseThrow(() -> new RuntimeException("Form not found"));
+        return dynamicTableService.fetchData(form.getTargetTableName(), page, size, sortBy, sortOrder, filters);
+    }
+
+    public Map<String, Object> getSubmissionById(UUID formId, UUID submissionId) {
+        Form form = formRepository.findById(formId)
+                .orElseThrow(() -> new com.sttl.formbuilder2.exception.FormBuilderException("FORM_NOT_FOUND", "Form not found"));
+        
+        try {
+            Map<String, Object> submission = dynamicTableService.fetchRowById(form.getTargetTableName(), submissionId);
+            
+            // Section 5.1: Ownership check for Drafts
+            String status = submission.get("submission_status") != null ? submission.get("submission_status").toString() : "";
+            String owner = submission.get("submitted_by") != null ? submission.get("submitted_by").toString() : "";
+            
+            if ("RESPONSE_DRAFT".equalsIgnoreCase(status) && !owner.equalsIgnoreCase(getCurrentUsername())) {
+                throw new com.sttl.formbuilder2.exception.FormBuilderException("FORBIDDEN", "You do not have permission to access this draft.");
+            }
+            
+            return submission;
+        } catch (org.springframework.dao.EmptyResultDataAccessException e) {
+            // Check if it was a discarded draft (Requirement 3.2)
+            Optional<com.sttl.formbuilder2.model.entity.FormSubmissionMeta> meta = formSubmissionMetaRepository.findBySubmissionRowId(submissionId);
+            if (meta.isPresent() && Boolean.TRUE.equals(meta.get().getIsDeleted()) && "RESPONSE_DRAFT".equals(meta.get().getStatus())) {
+                throw new com.sttl.formbuilder2.exception.FormBuilderException("DRAFT_DISCARDED", 
+                    "Your draft was discarded because the form was updated to a new version.");
+            }
+            throw new com.sttl.formbuilder2.exception.FormBuilderException("SUBMISSION_NOT_FOUND", "Submission not found or already deleted");
+        }
+    }
+
+    public Map<String, Object> getSubmissionByToken(String token, UUID submissionId) {
+        Form form = formRepository.findByPublicShareToken(token)
+                .orElseThrow(() -> new RuntimeException("Invalid share token"));
+        return getSubmissionById(form.getId(), submissionId);
+    }
+
+    @Transactional
+    public UUID updateSubmission(UUID formId, UUID submissionId, Map<String, Object> data, String status) {
+        Form form = formRepository.findById(formId)
+                .orElseThrow(() -> new com.sttl.formbuilder2.exception.FormBuilderException("FORM_NOT_FOUND", "Form not found"));
+
+        // Requirement 3.2 warning check
+        com.sttl.formbuilder2.model.entity.FormSubmissionMeta metaCheck = formSubmissionMetaRepository.findBySubmissionRowId(submissionId)
+            .orElseThrow(() -> new com.sttl.formbuilder2.exception.FormBuilderException("SUBMISSION_NOT_FOUND", "Submission not found"));
+            
+        // Section 5.1: Ownership check for Drafts
+        if ("RESPONSE_DRAFT".equalsIgnoreCase(metaCheck.getStatus()) && !metaCheck.getSubmittedBy().equalsIgnoreCase(getCurrentUsername())) {
+            throw new com.sttl.formbuilder2.exception.FormBuilderException("FORBIDDEN", "You do not have permission to modify this draft.");
+        }
+
+        if (Boolean.TRUE.equals(metaCheck.getIsDeleted()) && "RESPONSE_DRAFT".equalsIgnoreCase(metaCheck.getStatus())) {
+            throw new com.sttl.formbuilder2.exception.FormBuilderException("DRAFT_DISCARDED", 
+                "Your draft was discarded because the form was updated to a new version.");
+        }
+        // Requirement 5.1: Status Transition Validation
+        String currentStatus = metaCheck.getStatus();
+        if (( "SUBMITTED".equalsIgnoreCase(currentStatus) ) 
+            && "RESPONSE_DRAFT".equalsIgnoreCase(status)) {
+            throw new com.sttl.formbuilder2.exception.FormBuilderException("INVALID_STATUS_TRANSITION", 
+                "A submitted form cannot be reverted to a draft.");
+        }
+
+        // Requirement 5.2: Metadata Immutability (Lock version and user for SUBMITTED forms)
+        FormVersion effectiveVersion;
+        if ("SUBMITTED".equalsIgnoreCase(currentStatus)) {
+            effectiveVersion = formVersionRepository.findById(metaCheck.getFormVersionId())
+                .orElseThrow(() -> new RuntimeException("Original form version not found"));
+        } else {
+            effectiveVersion = form.getVersions().stream()
+                .max(Comparator.comparingInt(FormVersion::getVersionNumber))
+                .orElseThrow(() -> new RuntimeException("No versions found"));
+        }
+
+        validateSubmissionData(effectiveVersion, data, status);
+
+        calculationService.recalculateCalculatedFields(data, effectiveVersion.getFields());
+
+        data.put("updated_at", LocalDateTime.now());
+        data.put("is_draft", "RESPONSE_DRAFT".equals(status));
+        if (status != null)
+            data.put("submission_status", status);
+
+        dynamicTableService.validateNoSchemaDrift(form.getTargetTableName(), effectiveVersion.getFields());
+        dynamicTableService.updateData(form.getTargetTableName(), submissionId, data);
+
+        com.sttl.formbuilder2.model.entity.FormSubmissionMeta meta = formSubmissionMetaRepository
+                .findBySubmissionRowId(submissionId)
+                .orElseGet(() -> {
+                    com.sttl.formbuilder2.model.entity.FormSubmissionMeta m = new com.sttl.formbuilder2.model.entity.FormSubmissionMeta();
+                    m.setFormId(form.getId());
+                    m.setFormVersionId(effectiveVersion.getId());
+                    m.setSubmissionTable(form.getTargetTableName());
+                    m.setSubmissionRowId(submissionId);
+                    m.setSubmittedBy(getCurrentUsername());
+                    return m;
+                });
+
+        meta.setStatus(status != null ? status : "SUBMITTED");
+        meta.setSubmittedAt(java.time.Instant.now());
+        formSubmissionMetaRepository.save(meta);
+
+        // TRIGGER POST-SUBMISSION WORKFLOWS (Rule Engine)
+        if (effectiveVersion.getRules() != null && !effectiveVersion.getRules().isBlank()) {
+            try {
+                com.fasterxml.jackson.databind.JsonNode rootNode = objectMapper.readTree(effectiveVersion.getRules());
+                List<FormRuleDTO> rules;
+                if (rootNode.isArray()) {
+                    rules = objectMapper.convertValue(rootNode, new TypeReference<List<FormRuleDTO>>() {});
+                } else if (rootNode.isObject() && rootNode.has("rules")) {
+                    rules = objectMapper.convertValue(rootNode.get("rules"), new TypeReference<List<FormRuleDTO>>() {});
+                } else {
+                    rules = new ArrayList<>();
+                }
+                ruleEngineService.executePostSubmissionWorkflows(rules, data);
+            } catch (Exception e) {
+                System.err.println(">>> [WORKFLOW ERROR] Failed to trigger rules on update: " + e.getMessage());
+            }
+        }
+
+        return submissionId;
+    }
+
+    @Transactional
+    public UUID updateSubmissionByToken(String token, UUID submissionId, Map<String, Object> data, String status) {
+        Form form = formRepository.findByPublicShareToken(token)
+                .orElseThrow(() -> new RuntimeException("Invalid share token"));
+        return updateSubmission(form.getId(), submissionId, data, status);
+    }
+
+    @Transactional
+    public void deleteSubmission(UUID formId, UUID submissionId) {
+        Form form = formRepository.findById(formId)
+                .orElseThrow(() -> new RuntimeException("Form not found"));
+        dynamicTableService.deleteRow(form.getTargetTableName(), submissionId);
+        // Sync metadata
+        formSubmissionMetaRepository.findBySubmissionRowId(submissionId).ifPresent(meta -> {
+            meta.setIsDeleted(true);
+            formSubmissionMetaRepository.save(meta);
+        });
+    }
+
+    @Transactional
+    public void deleteSubmissionsBulk(UUID formId, List<UUID> submissionIds) {
+        Form form = formRepository.findById(formId)
+                .orElseThrow(() -> new RuntimeException("Form not found"));
+        dynamicTableService.deleteRowsBulk(form.getTargetTableName(), submissionIds);
+        // Sync metadata
+        for (UUID id : submissionIds) {
+            formSubmissionMetaRepository.findBySubmissionRowId(id).ifPresent(meta -> {
+                meta.setIsDeleted(true);
+                formSubmissionMetaRepository.save(meta);
+            });
+        }
+    }
+
+    /**
+     * SRS Bulk Operation: Update status for multiple submissions
+     */
+    @Transactional
+    public void updateSubmissionStatusBulk(UUID formId, List<UUID> submissionIds, String newStatus) {
+        Form form = formRepository.findById(formId)
+                .orElseThrow(() -> new RuntimeException("Form not found"));
+        
+        // Requirement 5.1: Status Transition Validation for Bulk
+        if ("RESPONSE_DRAFT".equalsIgnoreCase(newStatus)) {
+            for (UUID id : submissionIds) {
+                formSubmissionMetaRepository.findBySubmissionRowId(id).ifPresent(meta -> {
+                    if ("SUBMITTED".equalsIgnoreCase(meta.getStatus())) {
+                        throw new com.sttl.formbuilder2.exception.FormBuilderException("INVALID_STATUS_TRANSITION", 
+                            "Bulk operation failed: One or more submitted forms cannot be reverted to draft.");
+                    }
+                });
+            }
+        }
+
+        dynamicTableService.updateStatusBulk(form.getTargetTableName(), submissionIds, newStatus);
+
+        // Also update metadata table
+        for (UUID id : submissionIds) {
+            formSubmissionMetaRepository.findBySubmissionRowId(id).ifPresent(meta -> {
+                meta.setStatus(newStatus);
+                formSubmissionMetaRepository.save(meta);
+            });
+        }
+    }
+
+    public String exportSubmissionsToCsv(UUID formId, List<String> requestedColumns, String sortBy, String sortOrder, Map<String, String> filters) {
+        Form form = formRepository.findById(formId)
+                .orElseThrow(() -> new com.sttl.formbuilder2.exception.FormBuilderException("FORM_NOT_FOUND",
+                        "Form not found"));
+
+        List<String> allColumns = dynamicTableService.getTableColumns(form.getTargetTableName());
+        
+        // 7.1: Order strictly follows form definition or requested list
+        List<String> exportColumns;
+        if (requestedColumns != null && !requestedColumns.isEmpty()) {
+            exportColumns = requestedColumns.stream()
+                .filter(allColumns::contains)
+                .collect(Collectors.toList());
+        } else {
+            exportColumns = allColumns;
+        }
+
+        List<Map<String, Object>> data = dynamicTableService.fetchAllDataFiltered(form.getTargetTableName(), sortBy, sortOrder, filters);
+
+        StringBuilder csv = new StringBuilder();
+        // Header Row
+        csv.append(String.join(",", exportColumns)).append("\n");
+
+        for (Map<String, Object> row : data) {
+            List<String> rowValues = new ArrayList<>();
+            for (String col : exportColumns) {
+                Object val = row.get(col);
+                String strVal = val == null ? "" : val.toString().replace("\"", "\"\"");
+                
+                // 7.2: CSV Injection Protection - escape formula indicators
+                if (strVal.startsWith("=") || strVal.startsWith("+") || strVal.startsWith("-") || 
+                    strVal.startsWith("@") || strVal.startsWith("#") || strVal.startsWith("!")) {
+                    strVal = "'" + strVal;
+                }
+                rowValues.add("\"" + strVal + "\"");
+            }
+            csv.append(String.join(",", rowValues)).append("\n");
+        }
+        return csv.toString();
+    }
+
+    private void validateSubmissionData(FormVersion latestVersion, Map<String, Object> data, String status) {
+        if ("RESPONSE_DRAFT".equals(status)) {
+            return;
+        }
+
+        List<FormField> activeFields = latestVersion.getFields();
+        List<Map<String, String>> errors = new ArrayList<>();
+
+        // 1a. Native JSON Validations (required, min, max, minLength, maxLength, pattern)
+        for (FormField field : activeFields) {
+            Object val = data.get(field.getFieldKey());
+            boolean isBlank = (val == null || val.toString().trim().isEmpty());
+
+            if (Boolean.TRUE.equals(field.getIsRequired()) && isBlank) {
+                errors.add(Map.of("fieldKey", field.getFieldKey(), "message", field.getFieldLabel() + " is required."));
+            }
+
+            if (!isBlank && field.getValidationRules() != null) {
+                Map<String, Object> vr = field.getValidationRules();
+                String strVal = (val == null) ? "" : val.toString();
+
+                try {
+                    if (vr.containsKey("min") && vr.get("min") != null) {
+                        double min = Double.parseDouble(vr.get("min").toString());
+                        if (Double.parseDouble(strVal) < min)
+                            errors.add(Map.of("fieldKey", field.getFieldKey(), "message", "Must be >= " + min));
+                    }
+                    if (vr.containsKey("max") && vr.get("max") != null) {
+                        double max = Double.parseDouble(vr.get("max").toString());
+                        if (Double.parseDouble(strVal) > max)
+                            errors.add(Map.of("fieldKey", field.getFieldKey(), "message", "Must be <= " + max));
+                    }
+                } catch (NumberFormatException ignored) {}
+
+                if (vr.containsKey("minLength") && vr.get("minLength") != null) {
+                    int minL = Integer.parseInt(vr.get("minLength").toString());
+                    if (strVal.length() < minL)
+                        errors.add(Map.of("fieldKey", field.getFieldKey(), "message", "Minimum length is " + minL));
+                }
+                if (vr.containsKey("maxLength") && vr.get("maxLength") != null) {
+                    int maxL = Integer.parseInt(vr.get("maxLength").toString());
+                    if (strVal.length() > maxL)
+                        errors.add(Map.of("fieldKey", field.getFieldKey(), "message", "Maximum length is " + maxL));
+                }
+                if (vr.containsKey("pattern") && vr.get("pattern") != null) {
+                    String pat = vr.get("pattern").toString();
+                    if (!strVal.matches(pat))
+                        errors.add(Map.of("fieldKey", field.getFieldKey(), "message", "Invalid format"));
+                }
+            }
+        }
+
+        // 1b. AST Evaluator Validations
+        java.util.List<com.sttl.formbuilder2.model.entity.FieldValidation> validations = fieldValidationRepository
+                .findByFormVersionIdOrderByExecutionOrder(latestVersion.getId());
+
+        java.util.List<com.sttl.formbuilder2.model.entity.FieldValidation> fieldValidations = validations.stream()
+                .filter(v -> "FIELD".equals(v.getScope())).collect(Collectors.toList());
+        java.util.List<com.sttl.formbuilder2.model.entity.FieldValidation> formValidations = validations.stream()
+                .filter(v -> "FORM".equals(v.getScope())).collect(Collectors.toList());
+
+        for (com.sttl.formbuilder2.model.entity.FieldValidation fv : fieldValidations) {
+            boolean passed;
+            try {
+                passed = expressionEvaluatorService.evaluate(fv.getExpression(), data,
+                    fv.getId() != null ? fv.getId().toString() : "NEW", fv.getScope());
+            } catch (com.sttl.formbuilder2.exception.ExpressionEvaluationException e) {
+                throw new com.sttl.formbuilder2.exception.FormBuilderException("EXPRESSION_EVAL_FAILED",
+                    String.format("Evaluation failed: %s [ID: %s, Context: %s]", e.getMessage(), e.getExpressionId(), e.getContext()), e);
+            }
+            if (!passed) {
+                errors.add(Map.of("fieldKey", fv.getFieldKey(), "message", fv.getErrorMessage()));
+            }
+        }
+
+        if (errors.isEmpty()) {
+            for (com.sttl.formbuilder2.model.entity.FieldValidation fv : formValidations) {
+                boolean passed;
+                try {
+                    passed = expressionEvaluatorService.evaluate(fv.getExpression(), data,
+                        fv.getId() != null ? fv.getId().toString() : "NEW", fv.getScope());
+                } catch (com.sttl.formbuilder2.exception.ExpressionEvaluationException e) {
+                    throw new com.sttl.formbuilder2.exception.FormBuilderException("EXPRESSION_EVAL_FAILED",
+                        String.format("Evaluation failed: %s [ID: %s, Context: %s]", e.getMessage(), e.getExpressionId(), e.getContext()), e);
+                }
+                if (!passed) {
+                    errors.add(Map.of("fieldKey", "", "message", fv.getErrorMessage()));
+                }
+            }
+        }
+
+        if (!errors.isEmpty()) {
+            throw new com.sttl.formbuilder2.exception.ValidationFailedException("VALIDATION_ERROR", "Form validation failed", errors);
+        }
+
+        // 1c. Run legacy IF-THEN Actions (RuleEngineService)
+        if (latestVersion.getRules() != null && !latestVersion.getRules().isBlank()) {
+            try {
+                com.fasterxml.jackson.databind.JsonNode rootNode = objectMapper.readTree(latestVersion.getRules());
+                List<FormRuleDTO> rules;
+                if (rootNode.isArray()) {
+                    rules = objectMapper.convertValue(rootNode, new com.fasterxml.jackson.core.type.TypeReference<List<FormRuleDTO>>() {});
+                } else if (rootNode.isObject() && rootNode.has("rules")) {
+                    rules = objectMapper.convertValue(rootNode.get("rules"), new com.fasterxml.jackson.core.type.TypeReference<List<FormRuleDTO>>() {});
+                } else {
+                    rules = new ArrayList<>();
+                }
+                ruleEngineService.validateSubmission(rules, data);
+            } catch (org.springframework.web.server.ResponseStatusException e) {
+                throw e; // Re-throw validation errors
+            } catch (Exception e) {
+                System.err.println(">>> Rule Deserialization Error: " + e.getMessage());
+            }
+        }
+    }
+}

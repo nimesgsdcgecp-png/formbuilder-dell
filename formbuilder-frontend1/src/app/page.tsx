@@ -1,0 +1,763 @@
+'use client';
+
+import { useCallback, useEffect, useState } from 'react';
+import Link from 'next/link';
+import { Plus, FileText, Edit, Eye, Trash2, User, Link2, LayoutGrid, List as ListIcon, ExternalLink, Check, RotateCcw, Archive, Shield, Users } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import { toast } from 'sonner';
+import Header from '@/components/Header';
+import { deleteForm, restoreForm, getDashboardStats, DashboardStats, UnauthorizedError } from '@/services/api';
+import { usePermissions } from '@/hooks/usePermissions';
+import { AUTH, FORMS } from '@/utils/apiConstants';
+import AiArchitectModal from '@/components/AiArchitectModal';
+import { useRouter } from 'next/navigation';
+import { Sparkles } from 'lucide-react';
+
+/** Shape of each form card item from GET /api/forms */
+interface FormSummary {
+  id: number;
+  title: string;
+  description: string;
+  status: string;
+  publicShareToken?: string;
+  ownerName?: string;
+  approvedByName?: string;
+  approvalChain?: string;
+  issuedByUsername?: string;
+}
+
+/** Skeleton card shown while forms are loading */
+function SkeletonCard() {
+  return (
+    <div className="rounded-xl border overflow-hidden" style={{ background: 'var(--card-bg)', borderColor: 'var(--card-border)' }}>
+      <div className="p-6 space-y-3">
+        <div className="flex justify-between">
+          <div className="shimmer rounded-full h-5 w-20" />
+          <div className="shimmer rounded h-4 w-10" />
+        </div>
+        <div className="shimmer rounded h-6 w-3/4" />
+        <div className="shimmer rounded h-4 w-full" />
+        <div className="shimmer rounded h-4 w-2/3" />
+      </div>
+      <div className="px-6 py-4 border-t" style={{ borderColor: 'var(--border)', background: 'var(--bg-muted)' }}>
+        <div className="flex justify-between items-center">
+          <div className="flex gap-2">
+            <div className="shimmer rounded h-8 w-8" />
+            <div className="shimmer rounded h-8 w-8" />
+          </div>
+          <div className="shimmer rounded h-8 w-8" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Statistics card component */
+function StatsCard({ title, value, icon: Icon, colorClass, loading }: {
+  title: string,
+  value: number | string,
+  icon: LucideIcon,
+  colorClass: string,
+  loading?: boolean
+}) {
+  // Extract color for the glow effect
+  const iconColor = colorClass.split(' ').find(c => c.startsWith('text-'))?.replace('text-', '') || 'blue-500';
+
+  return (
+    <div className="flex-1 min-w-[220px] rounded-3xl border p-6 flex flex-col gap-3 transition-all duration-300 hover:shadow-xl hover:-translate-y-1 group active:scale-[0.98] overflow-hidden relative"
+      style={{
+        background: 'rgba(var(--bg-surface-rgb), 0.7)',
+        borderColor: 'var(--card-border)',
+        backdropFilter: 'blur(16px)',
+        WebkitBackdropFilter: 'blur(16px)'
+      }}>
+
+      {/* Dynamic Background Glow */}
+      <div className={`absolute -right-6 -bottom-6 w-32 h-32 opacity-[0.08] rounded-full blur-3xl transition-opacity duration-500 group-hover:opacity-[0.15]`}
+        style={{ backgroundColor: `var(--${iconColor.split('-')[0]})`, background: colorClass.includes('emerald') ? '#10b981' : colorClass.includes('blue') ? '#3b82f6' : colorClass.includes('amber') ? '#f59e0b' : '#a855f7' }} />
+
+      <div className="flex items-center gap-4 relative z-10 w-full mb-1">
+        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${colorClass} bg-opacity-10 backdrop-blur-md border border-current border-opacity-10 transition-all duration-300 group-hover:scale-110 group-hover:rotate-3 shadow-sm`}>
+          <Icon size={22} strokeWidth={2} />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-[11px] font-semibold uppercase tracking-widest opacity-50 truncate" style={{ color: 'var(--text-muted)' }}>{title}</p>
+          <div className="flex items-center gap-2">
+            {loading ? (
+              <div className="shimmer h-8 w-16 rounded-lg mt-1" />
+            ) : (
+              <h2 className="text-3xl font-bold tracking-tight mt-0.5" style={{ color: 'var(--text-primary)' }}>{value}</h2>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export default function Dashboard() {
+  const [forms, setForms] = useState<FormSummary[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [isStatsLoading, setIsStatsLoading] = useState(true);
+  const [username, setUsername] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'GRID' | 'LIST'>('GRID');
+  const [currentTab, setCurrentTab] = useState<'ACTIVE' | 'ARCHIVED'>('ACTIVE');
+  const [isAiModalOpen, setIsAiModalOpen] = useState(false);
+  const router = useRouter();
+
+  const { hasPermission, assignments } = usePermissions();
+
+  /** Fetches the form list from the backend and updates local state. */
+  const fetchForms = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const url = currentTab === 'ACTIVE'
+        ? FORMS.LIST
+        : FORMS.ARCHIVED;
+
+      const res = await fetch(url, {
+        credentials: 'include' // Important for session cookie
+      });
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.error(`Failed to fetch forms: ${res.status} ${res.statusText}`, errorText);
+        throw new Error(`Failed to fetch forms: ${res.status}`);
+      }
+
+      // Also fetch user profile information
+      if (!username) {
+        try {
+          const userRes = await fetch(AUTH.ME, { credentials: 'include' });
+          if (userRes.ok) {
+            const userData = await userRes.json();
+            setUsername(userData.username);
+          }
+        } catch (err) {
+          console.error("Could not fetch user profile", err);
+        }
+      }
+
+      const data = await res.json();
+      setForms(data);
+    } catch (error: unknown) {
+      console.error(error);
+      toast.error(error instanceof Error ? error.message : 'Failed to load dashboard.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [currentTab, username]);
+
+  /** Fetches dashboard statistics. */
+  const fetchStats = async () => {
+    setIsStatsLoading(true);
+    try {
+      const data = await getDashboardStats();
+      setStats(data);
+    } catch (error: unknown) {
+      if (!(error instanceof UnauthorizedError)) {
+        console.error("Failed to fetch stats", error);
+      }
+      // We don't toast here to avoid blocking the page
+    } finally {
+      setIsStatsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchForms();
+    fetchStats();
+  }, [currentTab, fetchForms]);
+
+  /**
+   * Shows a Sonner confirmation toast before archiving a form.
+   */
+  const handleDelete = (id: number) => {
+    toast('Archive this form?', {
+      description: 'It will be moved to your archives.',
+      action: {
+        label: 'Archive',
+        onClick: async () => {
+          try {
+            await deleteForm(id.toString());
+            toast.success("Form archived");
+            setForms((prevForms) => prevForms.filter(f => f.id !== id));
+          } catch (error: unknown) {
+            toast.error(error instanceof Error ? error.message : "Failed to archive form");
+          }
+        }
+      },
+      cancel: {
+        label: 'Cancel',
+        onClick: () => { }
+      }
+    });
+  };
+
+  const isAdmin = assignments.some(a => ['ADMIN', 'ROLE_ADMIN', 'ROLE_ADMINISTRATOR'].includes(a.role.name));
+
+
+  /**
+   * Restores a form from the archives.
+   */
+  const handleRestore = async (id: number) => {
+    try {
+      await restoreForm(id.toString());
+      toast.success("Form restored to drafts");
+      setForms((prevForms) => prevForms.filter(f => f.id !== id));
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : "Failed to restore form");
+    }
+  };
+
+  const handlePermanentDelete = (id: number) => {
+    toast("Permanently delete this form?", {
+      description: "This action is irreversible and all submissions will be lost.",
+      action: {
+        label: "Delete Now",
+        onClick: async () => {
+          try {
+            const res = await fetch(FORMS.DELETE_PERMANENT(id.toString()), {
+              method: 'DELETE',
+              credentials: 'include'
+            });
+            if (res.ok) {
+              toast.success("Form deleted permanently!");
+              setForms((prevForms) => prevForms.filter(f => f.id !== id));
+            } else {
+              const errorText = await res.text();
+              console.error("Permanent delete failed:", errorText);
+              toast.error("Failed to delete form: " + (errorText || "Server error"));
+            }
+          } catch (err) {
+            console.error("Network error during permanent delete:", err);
+            toast.error("Network error while deleting form");
+          }
+        }
+      },
+      duration: 10000,
+    });
+  };
+
+  return (
+    <div className="min-h-screen transition-colors duration-300" style={{ background: 'var(--bg-base)' }}>
+      {/* ── Header ── */}
+      <Header username={username} />
+
+      <main className="max-w-7xl mx-auto px-6 lg:px-8 py-10">
+        {/* Page title and Create Button */}
+        <div className="mb-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight" style={{ color: 'var(--text-primary)' }}>
+              {currentTab === 'ACTIVE' ? 'Your Forms' : 'Archived Forms'}
+            </h1>
+            <p className="text-sm mt-1" style={{ color: 'var(--text-muted)' }}>
+              {currentTab === 'ACTIVE' ? 'Manage and track your dynamic forms' : 'Previously deleted forms can be restored from here'}
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            {/* View Toggle */}
+            <div className="flex bg-bg-muted p-1 rounded-xl border mr-2" style={{ borderColor: 'var(--border)' }}>
+              <button
+                onClick={() => setViewMode('GRID')}
+                className={`p-1.5 rounded-lg transition-all ${viewMode === 'GRID' ? 'bg-card-bg shadow-sm text-accent' : 'text-text-faint'}`}
+                title="Grid View"
+              >
+                <LayoutGrid size={18} />
+              </button>
+              <button
+                onClick={() => setViewMode('LIST')}
+                className={`p-1.5 rounded-lg transition-all ${viewMode === 'LIST' ? 'bg-card-bg shadow-sm text-accent' : 'text-text-faint'}`}
+                title="List View"
+              >
+                <ListIcon size={18} />
+              </button>
+            </div>
+
+            {currentTab === 'ACTIVE' && (
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setIsAiModalOpen(true)}
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white bg-gradient-to-r from-blue-600 to-purple-500 shadow-sm hover:shadow-md transition-all active:scale-95 whitespace-nowrap"
+                >
+                  <Sparkles size={18} strokeWidth={3} />
+                  Design with AI
+                </button>
+                <Link
+                  href="/builder"
+                  className="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold bg-white border border-gray-200 text-gray-800 shadow-sm hover:shadow-md transition-all active:scale-95 whitespace-nowrap"
+                >
+                  <Plus size={18} strokeWidth={3} />
+                  Create New
+                </Link>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Statistics Widgets */}
+        <div className="flex flex-row gap-4 mb-16">
+          <StatsCard
+            title="Total Forms"
+            value={stats?.totalForms ?? 0}
+            icon={FileText}
+            colorClass="bg-blue-500/10 text-blue-500"
+            loading={isStatsLoading}
+          />
+          <StatsCard
+            title="Published"
+            value={stats?.publishedForms ?? 0}
+            icon={Check}
+            colorClass="bg-emerald-500/10 text-emerald-500"
+            loading={isStatsLoading}
+          />
+          <StatsCard
+            title="Drafts"
+            value={stats?.draftForms ?? 0}
+            icon={Edit}
+            colorClass="bg-amber-500/10 text-amber-500"
+            loading={isStatsLoading}
+          />
+          <StatsCard
+            title="Submissions"
+            value={stats?.totalSubmissions ?? 0}
+            icon={Users}
+            colorClass="bg-purple-500/10 text-purple-500"
+            loading={isStatsLoading}
+          />
+        </div>
+
+
+        {/* Sub-header with Tabs */}
+        <div className="mb-8 border-b mt-8" style={{ borderColor: 'var(--border)' }}>
+          <div className="flex gap-12 px-6">
+            <button
+              onClick={() => setCurrentTab('ACTIVE')}
+              className={`pb-4 text-sm font-bold tracking-tight transition-all relative ${currentTab === 'ACTIVE' ? 'text-accent' : 'text-text-muted'}`}
+            >
+              Active Forms
+              {currentTab === 'ACTIVE' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 gradient-accent rounded-full" />
+              )}
+            </button>
+            <button
+              onClick={() => setCurrentTab('ARCHIVED')}
+              className={`pb-4 text-sm font-bold tracking-tight transition-all relative ${currentTab === 'ARCHIVED' ? 'text-accent' : 'text-text-muted'}`}
+            >
+              Archived
+              {currentTab === 'ARCHIVED' && (
+                <div className="absolute bottom-0 left-0 right-0 h-0.5 gradient-accent rounded-full" />
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* ── Content ── */}
+        {isLoading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            {[1, 2, 3, 4].map(i => <SkeletonCard key={i} />)}
+          </div>
+        ) : forms.length === 0 ? (
+          /* Empty State */
+          <div className="text-center py-20 px-4 rounded-xl border border-dashed" style={{ borderColor: 'var(--border)', background: 'var(--card-bg)' }}>
+            <div
+              className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-5"
+              style={{ background: 'var(--bg-muted)', color: 'var(--text-muted)' }}
+            >
+              {currentTab === 'ACTIVE' ? <FileText size={30} /> : <Archive size={30} />}
+            </div>
+            <h3 className="text-lg font-semibold mb-2" style={{ color: 'var(--text-primary)' }}>
+              {currentTab === 'ACTIVE' ? 'No forms yet' : 'Archive is empty'}
+            </h3>
+            <p className="text-sm mb-6 max-w-sm mx-auto" style={{ color: 'var(--text-muted)' }}>
+              {currentTab === 'ACTIVE'
+                ? 'Get started by creating your first dynamic form. It only takes a few seconds.'
+                : 'Any forms you archive will appear here for 30 days before being permanently deleted.'}
+            </p>
+            {currentTab === 'ACTIVE' && (
+              <Link
+                href="/builder"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg text-sm font-semibold text-white gradient-accent shadow-sm hover:shadow-md transition-all"
+              >
+                <Plus size={16} /> Start Building
+              </Link>
+            )}
+          </div>
+        ) : (
+          viewMode === 'GRID' ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {forms.map((form) => {
+                const isPublished = form.status === 'PUBLISHED';
+                return (
+                  <div
+                    key={form.id}
+                    className="rounded-xl border flex flex-col overflow-hidden transition-all duration-200 hover:shadow-lg group"
+                    style={{
+                      background: 'var(--card-bg)',
+                      borderColor: 'var(--card-border)',
+                      boxShadow: 'var(--card-shadow)',
+                    }}
+                  >
+                    {/* Top colour accent bar by status */}
+                    <div
+                      className={`h-1 w-full ${isPublished ? 'bg-linear-to-r from-emerald-400 to-teal-500' : form.status === 'REJECTED' ? 'bg-red-500' : form.status.startsWith('PENDING') ? 'bg-amber-500' : 'bg-linear-to-r from-amber-400 to-orange-400'}`}
+                    />
+
+                    {/* Card body */}
+                    <div className="p-6 flex-1">
+                      <div className="flex justify-between items-start mb-3">
+                        {/* Status badge */}
+                        <span
+                          className="px-2.5 py-0.5 rounded-full text-xs font-semibold border"
+                          style={{
+                            background: currentTab === 'ARCHIVED' ? 'var(--bg-muted)' : (isPublished ? 'var(--status-pub-bg)' : form.status === 'REJECTED' ? '#fee2e2' : form.status.startsWith('PENDING') ? '#fff7ed' : 'var(--status-draft-bg)'),
+                            color: currentTab === 'ARCHIVED' ? 'var(--text-muted)' : (isPublished ? 'var(--status-pub-text)' : form.status === 'REJECTED' ? '#ef4444' : form.status.startsWith('PENDING') ? '#f59e0b' : 'var(--text-primary)'),
+                            borderColor: currentTab === 'ARCHIVED' ? 'var(--border)' : (isPublished ? 'var(--status-pub-ring)' : form.status === 'REJECTED' ? '#fecaca' : form.status.startsWith('PENDING') ? '#ffedd5' : 'var(--border)'),
+                          }}
+                        >
+                          {currentTab === 'ARCHIVED' ? 'ARCHIVED' : (
+                            form.status === 'PUBLISHED' ? '● Published' :
+                              form.status === 'DRAFT' ? '◌ Draft' :
+                                form.status === 'REJECTED' ? '✕ Rejected' : '◒ Pending'
+                          )}
+                        </span>
+                      </div>
+
+                      <h3
+                        className="text-base font-bold mb-1.5 truncate leading-snug"
+                        style={{ color: 'var(--text-primary)' }}
+                      >
+                        {form.title}
+                      </h3>
+                      <p className="text-sm line-clamp-2" style={{ color: 'var(--text-muted)' }}>
+                        {form.description || "No description provided."}
+                      </p>
+
+                      <div className="mt-4 pt-4 border-t space-y-2" style={{ borderColor: 'var(--border)' }}>
+                        <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-faint)' }}>
+                          <User size={12} className="text-accent" />
+                          <span>Owner: {form.ownerName || 'Unknown'}</span>
+                        </div>
+                        {form.issuedByUsername && (
+                          <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-faint)' }}>
+                            <Plus size={12} className="text-blue-500" />
+                            <span>Issued By: {form.issuedByUsername}</span>
+                          </div>
+                        )}
+                        {form.approvalChain && (
+                          <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest" style={{ color: 'var(--text-faint)' }}>
+                            <Shield size={12} className="text-emerald-500" />
+                            <span>Approved By: {form.approvalChain}</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Card footer */}
+                    <div
+                      className="px-6 py-3 border-t flex justify-between items-center"
+                      style={{ background: 'var(--bg-muted)', borderColor: 'var(--border)' }}
+                    >
+                      <div className="flex gap-1">
+                        {currentTab === 'ACTIVE' ? (
+                          <>
+                            {/* Edit Button */}
+                            {(hasPermission('EDIT', form.id) || form.issuedByUsername === username || form.approvedByName === username) && (
+                              <Link
+                                href={`/builder?id=${form.id}`}
+                                className="p-2 rounded-lg transition-all"
+                                style={{ color: 'var(--text-muted)' }}
+                                title="Edit Form"
+                                onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent-subtle)', e.currentTarget.style.color = 'var(--accent)')}
+                                onMouseLeave={e => (e.currentTarget.style.background = 'transparent', e.currentTarget.style.color = 'var(--text-muted)')}
+                              >
+                                <Edit size={16} />
+                              </Link>
+                            )}
+
+                            {isPublished && (
+                              <>
+                                {form.publicShareToken && (
+                                  <button
+                                    onClick={() => {
+                                      const url = `${window.location.origin}/f/${form.publicShareToken}`;
+                                      navigator.clipboard.writeText(url);
+                                      toast.success("Share link copied!");
+                                    }}
+                                    className="p-2 rounded-lg transition-all"
+                                    style={{ color: 'var(--text-muted)', cursor: 'pointer' }}
+                                    title="Copy Share Link"
+                                    onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent-subtle)', e.currentTarget.style.color = 'var(--accent)')}
+                                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent', e.currentTarget.style.color = 'var(--text-muted)')}
+                                  >
+                                    <Link2 size={16} />
+                                  </button>
+                                )}
+                                {form.publicShareToken && (
+                                  <Link
+                                    href={`/f/${form.publicShareToken}`}
+                                    target="_blank"
+                                    className="p-2 rounded-lg transition-all"
+                                    style={{ color: 'var(--text-muted)' }}
+                                    title="View Public Form"
+                                    onMouseEnter={e => (e.currentTarget.style.background = '#d1fae5', e.currentTarget.style.color = '#059669')}
+                                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent', e.currentTarget.style.color = 'var(--text-muted)')}
+                                  >
+                                    <Eye size={16} />
+                                  </Link>
+                                )}
+                                {(hasPermission('READ', form.id) || form.issuedByUsername === username || form.approvedByName === username) && (
+                                  <Link
+                                    href={`/forms/${form.id}/responses`}
+                                    className="p-2 rounded-lg transition-all"
+                                    style={{ color: 'var(--text-muted)' }}
+                                    title="View Responses"
+                                    onMouseEnter={e => (e.currentTarget.style.background = '#ede9fe', e.currentTarget.style.color = '#7c3aed')}
+                                    onMouseLeave={e => (e.currentTarget.style.background = 'transparent', e.currentTarget.style.color = 'var(--text-muted)')}
+                                  >
+                                    <FileText size={16} />
+                                  </Link>
+                                )}
+                              </>
+                            )}
+                          </>
+                        ) : (
+                          <button
+                            onClick={() => handleRestore(form.id)}
+                            className="p-2 rounded-lg transition-all"
+                            style={{ color: 'var(--accent)' }}
+                            title="Restore Form"
+                            onMouseEnter={e => (e.currentTarget.style.background = 'var(--accent-subtle)')}
+                            onMouseLeave={e => (e.currentTarget.style.background = 'transparent')}
+                          >
+                            <RotateCcw size={16} />
+                          </button>
+                        )}
+                      </div>
+
+                      {currentTab === 'ACTIVE' && (hasPermission('DELETE', form.id) || form.issuedByUsername === username || form.approvedByName === username) && (
+                        <button
+                          onClick={() => handleDelete(form.id)}
+                          className="p-2 rounded-lg transition-all"
+                          style={{ color: 'var(--text-faint)' }}
+                          title="Archive Form"
+                          onMouseEnter={e => (e.currentTarget.style.background = '#fee2e2', e.currentTarget.style.color = '#dc2626')}
+                          onMouseLeave={e => (e.currentTarget.style.background = 'transparent', e.currentTarget.style.color = 'var(--text-faint)')}
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
+
+                      {currentTab === 'ARCHIVED' && isAdmin && (
+                        <button
+                          onClick={() => handlePermanentDelete(form.id)}
+                          className="p-2 rounded-lg transition-all text-red-500 hover:bg-red-500/10"
+                          title="Permanently Delete Form"
+                        >
+                          <Trash2 size={16} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          ) : (
+            <>
+              {/* Table View (Desktop) */}
+              <div className="hidden lg:block rounded-2xl border overflow-hidden shadow-sm" style={{ background: 'var(--card-bg)', borderColor: 'var(--border)' }}>
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className="border-b" style={{ background: 'var(--bg-muted)', borderColor: 'var(--border)' }}>
+                      <th className="px-6 py-4 text-xs font-bold uppercase tracking-widest text-text-faint">Form Title</th>
+                      <th className="px-6 py-4 text-xs font-bold uppercase tracking-widest text-text-faint">Status</th>
+                      <th className="px-6 py-4 text-xs font-bold uppercase tracking-widest text-right text-text-faint">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y" style={{ borderColor: 'var(--border)' }}>
+                    {forms.map((form) => {
+                      const isPublished = form.status === 'PUBLISHED';
+                      return (
+                        <tr key={form.id} className="hover:bg-bg-subtle transition-colors group">
+                          <td className="px-6 py-4">
+                            <div>
+                              <p className="text-sm font-bold text-text-primary leading-tight">{form.title}</p>
+                              <div className="flex items-center gap-3 mt-1 overflow-hidden">
+                                <p className="text-[10px] text-text-muted truncate max-w-xs">{form.description || "No description"}</p>
+                                <span className="w-1 h-1 rounded-full bg-border-color shrink-0" />
+                                <span className="text-[9px] font-black text-text-faint uppercase tracking-tight whitespace-nowrap">Owner: {form.ownerName || 'Unknown'}</span>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span
+                              className="inline-flex items-center px-2 py-0.5 rounded-full text-[9px] font-black border"
+                              style={{
+                                background: currentTab === 'ARCHIVED' ? 'var(--bg-muted)' : (isPublished ? 'var(--status-pub-bg)' : 'var(--status-draft-bg)'),
+                                color: currentTab === 'ARCHIVED' ? 'var(--text-muted)' : (isPublished ? 'var(--status-pub-text)' : 'var(--status-draft-text)'),
+                                borderColor: currentTab === 'ARCHIVED' ? 'var(--border)' : (isPublished ? 'var(--status-pub-ring)' : 'var(--status-draft-ring)'),
+                              }}
+                            >
+                              {currentTab === 'ARCHIVED' ? 'ARCHIVED' : (isPublished ? 'PUBLISHED' : 'DRAFT')}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-right">
+                            <div className="flex justify-end gap-1">
+                              {currentTab === 'ACTIVE' ? (
+                                <>
+                                  <Link
+                                    href={`/builder?id=${form.id}`}
+                                    className="p-1.5 rounded-lg hover:bg-accent-subtle hover:text-accent text-text-muted transition-all"
+                                    title="Edit"
+                                  >
+                                    <Edit size={16} />
+                                  </Link>
+
+                                  {isPublished && (
+                                    <>
+                                      <Link
+                                        href={`/f/${form.publicShareToken}`}
+                                        target="_blank"
+                                        className="p-1.5 rounded-lg hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-950/30 text-text-muted transition-all"
+                                        title="View Public"
+                                      >
+                                        <ExternalLink size={16} />
+                                      </Link>
+                                      {(hasPermission('READ', form.id) || form.issuedByUsername === username || form.approvedByName === username) && (
+                                        <Link
+                                          href={`/forms/${form.id}/responses`}
+                                          className="p-1.5 rounded-lg hover:bg-violet-50 hover:text-violet-600 dark:hover:bg-violet-950/30 text-text-muted transition-all"
+                                          title="Responses"
+                                        >
+                                          <FileText size={16} />
+                                        </Link>
+                                      )}
+                                    </>
+                                  )}
+
+                                  <button
+                                    onClick={() => handleDelete(form.id)}
+                                    className="p-1.5 rounded-lg hover:bg-red-50 hover:text-red-600 dark:hover:bg-red-950/30 text-text-faint transition-all"
+                                    title="Archive"
+                                  >
+                                    <Trash2 size={16} />
+                                  </button>
+                                </>
+                              ) : (
+                                <button
+                                  onClick={() => handleRestore(form.id)}
+                                  className="p-1.5 rounded-lg hover:bg-accent-subtle text-accent transition-all"
+                                  title="Restore"
+                                >
+                                  <RotateCcw size={16} />
+                                </button>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Card View (Mobile) */}
+              <div className="lg:hidden space-y-4">
+                {forms.map((form) => {
+                  const isPublished = form.status === 'PUBLISHED';
+                  return (
+                    <div
+                      key={form.id}
+                      className="p-5 rounded-2xl border shadow-sm space-y-4"
+                      style={{ background: 'var(--card-bg)', borderColor: 'var(--border)' }}
+                    >
+                      <div className="flex justify-between items-start">
+                        <div className="flex flex-col gap-1">
+                          <span
+                            className="inline-flex items-center w-fit px-2 py-0.5 rounded-full text-[9px] font-black border"
+                            style={{
+                              background: currentTab === 'ARCHIVED' ? 'var(--bg-muted)' : (isPublished ? 'var(--status-pub-bg)' : 'var(--status-draft-bg)'),
+                              color: currentTab === 'ARCHIVED' ? 'var(--text-muted)' : (isPublished ? 'var(--status-pub-text)' : 'var(--status-draft-text)'),
+                              borderColor: currentTab === 'ARCHIVED' ? 'var(--border)' : (isPublished ? 'var(--status-pub-ring)' : 'var(--status-draft-ring)'),
+                            }}
+                          >
+                            {currentTab === 'ARCHIVED' ? 'ARCHIVED' : (isPublished ? 'PUBLISHED' : 'DRAFT')}
+                          </span>
+                        </div>
+                        <div className="flex gap-1">
+                          {currentTab === 'ACTIVE' ? (
+                            <>
+                              {(hasPermission('EDIT', form.id) || form.issuedByUsername === username || form.approvedByName === username) && (
+                                <Link
+                                  href={`/builder?id=${form.id}`}
+                                  className="p-2 rounded-xl bg-bg-base border text-text-muted"
+                                  style={{ borderColor: 'var(--border)' }}
+                                >
+                                  <Edit size={16} />
+                                </Link>
+                              )}
+                            </>
+                          ) : (
+                            <button
+                              onClick={() => handleRestore(form.id)}
+                              className="p-2 rounded-xl bg-accent-subtle text-accent"
+                            >
+                              <RotateCcw size={16} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+
+                      <div>
+                        <h3 className="text-sm font-bold text-text-primary mb-1 leading-tight">{form.title}</h3>
+                        <p className="text-[10px] text-text-muted line-clamp-2 leading-relaxed">
+                          {form.description || "No description provided."}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-3 pt-3 border-t border-dashed" style={{ borderColor: 'var(--border)' }}>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-[9px] font-black text-text-faint uppercase tracking-widest mb-0.5">Owner Identity</p>
+                          <p className="text-[10px] font-bold text-text-secondary truncate">{form.ownerName || 'Unknown System User'}</p>
+                        </div>
+                        <div className="flex gap-2">
+                          {isPublished && currentTab === 'ACTIVE' && (hasPermission('READ', form.id) || form.issuedByUsername === username || form.approvedByName === username) && (
+                            <Link
+                              href={`/forms/${form.id}/responses`}
+                              className="px-3 py-1.5 rounded-lg bg-bg-muted text-text-primary text-[10px] font-black uppercase tracking-widest border"
+                              style={{ borderColor: 'var(--border)' }}
+                            >
+                              Stats
+                            </Link>
+                          )}
+                          {currentTab === 'ACTIVE' && (hasPermission('DELETE', form.id) || form.issuedByUsername === username || form.approvedByName === username) && (
+                            <button
+                              onClick={() => handleDelete(form.id)}
+                              className="p-1.5 rounded-lg text-red-500 hover:bg-red-50"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
+          )
+        )}
+      </main>
+
+      <AiArchitectModal 
+        isOpen={isAiModalOpen} 
+        onClose={() => setIsAiModalOpen(false)} 
+        onImport={(schema) => {
+          localStorage.setItem('ai_draft', JSON.stringify(schema));
+          router.push('/builder?source=ai');
+          setIsAiModalOpen(false);
+        }}
+      />
+    </div>
+  );
+}

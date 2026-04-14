@@ -1,0 +1,372 @@
+package com.sttl.formbuilder2.controller;
+
+import com.sttl.formbuilder2.dto.request.CreateFormRequestDTO;
+import com.sttl.formbuilder2.dto.request.SubmissionRequestDTO;
+import com.sttl.formbuilder2.dto.request.UpdateFormRequestDTO;
+import com.sttl.formbuilder2.dto.response.FormDetailResponseDTO;
+import com.sttl.formbuilder2.dto.response.FormSummaryResponseDTO;
+import com.sttl.formbuilder2.service.DynamicTableService;
+import com.sttl.formbuilder2.service.FormService;
+import com.sttl.formbuilder2.service.SubmissionService;
+import com.sttl.formbuilder2.util.ApiConstants;
+import lombok.RequiredArgsConstructor;
+import jakarta.validation.Valid;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.UUID;
+import java.util.Map;
+import java.util.stream.Collectors;
+
+/**
+ * REST Controller for Forms and Submissions.
+ * Exposes the primary API under /api/forms.
+ * Delegates business logic to FormService, SubmissionService, and DynamicTableService.
+ */
+@RestController
+@RequestMapping(ApiConstants.FORMS_BASE)
+@RequiredArgsConstructor
+public class FormController {
+
+    private final FormService formService;
+    private final SubmissionService submissionService;
+    private final DynamicTableService dynamicTableService;
+
+    // ─────────────────────────────────────────────────────────
+    // Form CRUD
+    // ─────────────────────────────────────────────────────────
+
+    /**
+     * GET /api/forms
+     * Returns a lightweight list of all non-archived forms for the dashboard.
+     * Uses {@code FormSummaryResponseDTO} to avoid over-fetching field/version
+     * data.
+     */
+    @GetMapping(ApiConstants.FORMS_LIST)
+    public ResponseEntity<List<FormSummaryResponseDTO>> getAllForms() {
+        return ResponseEntity.ok(formService.getAllForms());
+    }
+
+    /**
+     * GET /api/forms/archived
+     * Returns a list of all archived forms for the current user.
+     */
+    @GetMapping(ApiConstants.FORMS_ARCHIVED)
+    public ResponseEntity<List<FormSummaryResponseDTO>> getArchivedForms() {
+        return ResponseEntity.ok(formService.getArchivedForms());
+    }
+
+    /**
+     * GET /api/forms/stats
+     * Returns statistics for the dashboard.
+     */
+    @GetMapping(ApiConstants.FORMS_STATS)
+    public ResponseEntity<com.sttl.formbuilder2.dto.response.DashboardStatsResponseDTO> getDashboardStats() {
+        return ResponseEntity.ok(formService.getDashboardStats());
+    }
+
+    /**
+     * POST /api/forms
+     * Creates a brand-new form (DRAFT status). Does NOT create a submission table
+     * yet — that only happens on Publish (PUT with status=PUBLISHED).
+     */
+    @PostMapping(ApiConstants.FORMS_CREATE)
+    public ResponseEntity<FormDetailResponseDTO> createForm(@Valid @RequestBody CreateFormRequestDTO request) {
+        return ResponseEntity.ok(formService.createForm(request));
+    }
+
+    /**
+     * GET /api/forms/{id}
+     * Returns the full form detail including the current version's fields and
+     * logic rules. Used by the builder when loading an existing form to edit,
+     * and by the responses page to build the table column headers.
+     */
+    @GetMapping(ApiConstants.FORMS_GET)
+    public ResponseEntity<FormDetailResponseDTO> getForm(@PathVariable("id") UUID id) {
+        return ResponseEntity.ok(formService.getFormById(id));
+    }
+
+    /**
+     * PUT /api/forms/{id}
+     * Updates an existing form. If the status is changing to PUBLISHED, this also
+     * creates or alters the dynamic submission table via
+     * {@code DynamicTableService}.
+     */
+    @PutMapping(ApiConstants.FORMS_UPDATE)
+    public ResponseEntity<FormDetailResponseDTO> updateForm(@PathVariable("id") UUID id, @Valid @RequestBody UpdateFormRequestDTO request) {
+        return ResponseEntity.ok(formService.updateForm(id, request));
+    }
+
+    /**
+     * DELETE /api/forms/{id}
+     * Soft-deletes a form by setting its status to ARCHIVED. The form data and
+     * all submissions remain in the database.
+     */
+    @DeleteMapping(ApiConstants.FORMS_DELETE)
+    public ResponseEntity<Void> deleteForm(@PathVariable("id") UUID id) {
+        formService.deleteForm(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    /**
+     * DELETE /api/forms/{id}/permanent
+     * Hard-deletes a form from the database. Restricted to administrators.
+     */
+    @DeleteMapping(ApiConstants.FORMS_DELETE_PERMANENT)
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'ROLE_ADMINISTRATOR')")
+    public ResponseEntity<?> hardDeleteForm(@PathVariable("id") UUID id) {
+        try {
+            formService.hardDeleteForm(id);
+            return ResponseEntity.noContent().build();
+        } catch (Exception e) {
+            System.err.println("!!! PERMANENT DELETE ERROR: " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.status(500).body("Error during permanent delete: " + e.getMessage());
+        }
+    }
+
+    /**
+     * PUT /api/forms/{id}/restore
+     * Restores an archived form back to DRAFT status.
+     */
+    @PutMapping(ApiConstants.FORMS_RESTORE)
+    public ResponseEntity<Void> restoreForm(@PathVariable("id") UUID id) {
+        formService.restoreForm(id);
+        return ResponseEntity.ok().build();
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // Submission endpoints
+    // ─────────────────────────────────────────────────────────
+
+    @GetMapping(ApiConstants.SUBMISSIONS_LIST)
+    public ResponseEntity<Map<String, Object>> getSubmissions(
+            @PathVariable("id") UUID id,
+            @RequestParam(name = "page", defaultValue = "0") int page,
+            @RequestParam(name = "size", defaultValue = "50") int size,
+            @RequestParam(name = "sortBy", defaultValue = "submitted_at") String sortBy,
+            @RequestParam(name = "sortOrder", defaultValue = "DESC") String sortOrder,
+            @RequestParam Map<String, String> allParams) {
+
+        // Filter out known pagination params to leave only custom column filters
+        Map<String, String> filters = allParams.entrySet().stream()
+                .filter(e -> !List.of("page", "size", "sortBy", "sortOrder").contains(e.getKey()))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+        return ResponseEntity.ok(submissionService.getSubmissions(id, page, size, sortBy, sortOrder, filters));
+    }
+
+    @GetMapping(ApiConstants.SUBMISSIONS_EXPORT)
+    public ResponseEntity<byte[]> exportSubmissions(
+            @PathVariable("id") UUID id,
+            @RequestParam(name = "columns", required = false) List<String> columns,
+            @RequestParam(name = "sortBy", defaultValue = "submitted_at") String sortBy,
+            @RequestParam(name = "sortOrder", defaultValue = "DESC") String sortOrder,
+            @RequestParam Map<String, String> allParams) {
+        
+        // Filter out known pagination params to leave only custom column filters
+        Map<String, String> filters = allParams.entrySet().stream()
+                .filter(e -> !List.of("columns", "sortBy", "sortOrder").contains(e.getKey()))
+                .collect(Collectors.toMap(Map.Entry::getKey, Map.Entry::getValue));
+
+        String csvData = submissionService.exportSubmissionsToCsv(id, columns, sortBy, sortOrder, filters);
+        byte[] output = csvData.getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        return ResponseEntity.ok()
+                .header("Content-Disposition", "attachment; filename=\"submissions_" + id + ".csv\"")
+                .header("Content-Type", "text/csv; charset=UTF-8")
+                .body(output);
+    }
+
+    /**
+     * POST /api/forms/{id}/submissions
+     * Accepts a JSON map of {fieldKey: value} pairs and inserts a new row into
+     * the dynamic submissions table. Runs rule validation before inserting. Returns
+     * the generated {@code submissionId} (UUID) so the frontend can offer an edit
+     * link.
+     */
+    @PostMapping(ApiConstants.SUBMISSIONS_CREATE)
+    public ResponseEntity<Map<String, Object>> submitForm(
+            @PathVariable("id") UUID id,
+            @Valid @RequestBody SubmissionRequestDTO request) {
+
+        UUID submissionId = submissionService.submitData(id, request.getData(), request.getFormVersionId(), request.getStatus());
+        return ResponseEntity.ok(Map.of(
+                "message", "Submission successful",
+                "submissionId", submissionId));
+    }
+
+    /**
+     * GET /api/forms/{formId}/submissions/{submissionId}
+     * Retrieves a single submission row by its UUID. Used by the public form page
+     * to pre-fill the form when a respondent clicks "Edit your response".
+     */
+    @GetMapping(ApiConstants.SUBMISSIONS_GET)
+    public ResponseEntity<Map<String, Object>> getSubmission(
+            @PathVariable("formId") UUID formId,
+            @PathVariable("submissionId") UUID submissionId) {
+        return ResponseEntity.ok(submissionService.getSubmissionById(formId, submissionId));
+    }
+
+    /**
+     * PUT /api/forms/{formId}/submissions/{submissionId}
+     * Updates an existing submission row with new answer values. Only columns
+     * present in the current form version are included in the UPDATE statement.
+     */
+    @PutMapping(ApiConstants.SUBMISSIONS_UPDATE)
+    public ResponseEntity<Map<String, Object>> updateSubmission(
+            @PathVariable("formId") UUID formId,
+            @PathVariable("submissionId") UUID submissionId,
+            @Valid @RequestBody SubmissionRequestDTO request) {
+        UUID id = submissionService.updateSubmission(formId, submissionId, request.getData(), request.getStatus());
+        return ResponseEntity.ok(Map.of("submissionId", id, "message", "Update successful"));
+    }
+
+    /**
+     * DELETE /api/forms/{formId}/submissions/{submissionId}
+     * Hard-deletes a submission row from the dynamic table. Used by the admin
+     * responses page. This action is irreversible.
+     */
+    @DeleteMapping(ApiConstants.SUBMISSIONS_DELETE)
+    public ResponseEntity<Void> deleteSubmission(
+            @PathVariable("formId") UUID formId,
+            @PathVariable("submissionId") UUID submissionId) {
+        submissionService.deleteSubmission(formId, submissionId);
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * DELETE /api/forms/{formId}/submissions/bulk
+     * Hard-deletes multiple submission rows in one call.
+     */
+    @DeleteMapping(ApiConstants.SUBMISSIONS_BULK_DELETE)
+    public ResponseEntity<Void> deleteSubmissionsBulk(
+            @PathVariable("formId") UUID formId,
+            @RequestBody List<UUID> submissionIds) {
+        submissionService.deleteSubmissionsBulk(formId, submissionIds);
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * POST /api/forms/{id}/submissions/{submissionId}/restore
+     * Restores a soft-deleted submission.
+     */
+    @PostMapping(ApiConstants.SUBMISSIONS_RESTORE)
+    public ResponseEntity<Void> restoreSubmission(
+            @PathVariable("id") UUID id,
+            @PathVariable("submissionId") UUID submissionId) {
+        submissionService.restoreSubmission(id, submissionId);
+        return ResponseEntity.ok().build();
+    }
+
+    /**
+     * POST /api/v1/forms/{formId}/submissions/bulk
+     * Generic bulk operation endpoint (Blueprint §3.2).
+     * Supports: DELETE, STATUS_UPDATE, RESTORE
+     */
+    @PostMapping(ApiConstants.SUBMISSIONS_BULK)
+    public ResponseEntity<Map<String, Object>> bulkOperation(
+            @PathVariable("formId") UUID formId,
+            @RequestBody Map<String, Object> request) {
+        String operation = (String) request.get("operation");
+        @SuppressWarnings("unchecked")
+        List<String> idsStr = (List<String>) request.get("submissionIds");
+        List<UUID> submissionIds = idsStr.stream().map(UUID::fromString).collect(Collectors.toList());
+
+        if ("DELETE".equalsIgnoreCase(operation)) {
+            submissionService.deleteSubmissionsBulk(formId, submissionIds);
+            return ResponseEntity.ok(Map.of("processed", submissionIds.size(), "failed", 0));
+        }
+
+        if ("RESTORE".equalsIgnoreCase(operation)) {
+            submissionService.restoreSubmissionsBulk(formId, submissionIds);
+            return ResponseEntity.ok(Map.of("processed", submissionIds.size(), "failed", 0));
+        }
+
+        if ("STATUS_UPDATE".equalsIgnoreCase(operation)) {
+            String newStatus = (String) request.get("status");
+            if (newStatus == null || newStatus.isBlank()) {
+                throw new com.sttl.formbuilder2.exception.FormBuilderException("BAD_REQUEST", "status is required for STATUS_UPDATE operation");
+            }
+            submissionService.updateSubmissionStatusBulk(formId, submissionIds, newStatus);
+            return ResponseEntity.ok(Map.of("processed", submissionIds.size(), "failed", 0));
+        }
+
+        throw new com.sttl.formbuilder2.exception.FormBuilderException("BAD_REQUEST", "Unsupported bulk operation: " + operation);
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // Lookup values (for LOOKUP field type)
+    // ─────────────────────────────────────────────────────────
+
+    /**
+     * GET /api/forms/{id}/columns/{fieldKey}/values
+     * Returns distinct non-null values for a given column in the form's submission
+     * table. Drives the dropdown choices for LOOKUP fields at form-fill time.
+     * The column name is validated against the form schema to prevent SQL
+     * injection.
+     */
+    @GetMapping(ApiConstants.SUBMISSIONS_LOOKUP_VALUES)
+    public ResponseEntity<List<String>> getLookupValues(
+            @PathVariable("id") UUID id,
+            @PathVariable("fieldKey") String fieldKey) {
+        return ResponseEntity.ok(dynamicTableService.getColumnValues(id, fieldKey));
+    }
+
+    // ─────────────────────────────────────────────────────────
+    // Public (token-based) form access — no authentication required
+    // ─────────────────────────────────────────────────────────
+
+    /**
+     * GET /api/forms/public/{token}
+     * Resolves a UUID share token to the full form schema. Called by the public
+     * form page ({@code /f/[token]}) before rendering the form to respondents.
+     * Uses a token instead of an ID to prevent enumeration attacks.
+     */
+    @GetMapping(ApiConstants.FORMS_PUBLIC)
+    public ResponseEntity<FormDetailResponseDTO> getPublicForm(@PathVariable("token") String token) {
+        return ResponseEntity.ok(formService.getFormByToken(token));
+    }
+
+    /**
+     * POST /api/forms/public/{token}/submissions
+     * Accepts a submission from a public respondent (identified by share token, no
+     * auth required). Resolves the token to a form ID then delegates to the
+     * standard
+     * submitData flow, including rule validation and workflow execution.
+     */
+    @PostMapping(ApiConstants.FORMS_PUBLIC_SUBMISSIONS)
+    public ResponseEntity<?> submitPublicForm(
+            @PathVariable("token") String token,
+            @Valid @RequestBody SubmissionRequestDTO request) {
+        UUID submissionId = submissionService.submitDataByToken(token, request.getData(), request.getFormVersionId(), request.getStatus());
+        return ResponseEntity.ok(Map.of(
+                "message", "Submission successful",
+                "submissionId", submissionId));
+    }
+
+    /**
+     * GET /api/forms/public/{token}/submissions/{submissionId}
+     * Publicly retrieve a single submission for editing.
+     */
+    @GetMapping(ApiConstants.FORMS_PUBLIC_SUBMISSION_GET)
+    public ResponseEntity<Map<String, Object>> getPublicSubmission(
+            @PathVariable("token") String token,
+            @PathVariable("submissionId") UUID submissionId) {
+        return ResponseEntity.ok(submissionService.getSubmissionByToken(token, submissionId));
+    }
+
+    /**
+     * PUT /api/forms/public/{token}/submissions/{submissionId}
+     * Publicly update an existing submission.
+     */
+    @PutMapping(ApiConstants.FORMS_PUBLIC_SUBMISSION_UPDATE)
+    public ResponseEntity<Map<String, Object>> updatePublicSubmission(
+            @PathVariable("token") String token,
+            @PathVariable("submissionId") UUID submissionId,
+            @Valid @RequestBody SubmissionRequestDTO request) {
+        UUID id = submissionService.updateSubmissionByToken(token, submissionId, request.getData(),
+                request.getStatus());
+        return ResponseEntity.ok(Map.of("submissionId", id, "message", "Update successful"));
+    }
+}

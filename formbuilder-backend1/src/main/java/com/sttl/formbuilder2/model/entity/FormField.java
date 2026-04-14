@@ -1,0 +1,160 @@
+package com.sttl.formbuilder2.model.entity;
+
+import java.util.UUID;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.sttl.formbuilder2.model.enums.FieldType;
+import jakarta.persistence.*;
+import lombok.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
+import java.util.Map;
+
+/**
+ * FormField — A Single Field within a {@link FormVersion}
+ *
+ * What it does:
+ * Represents one question/input on a form — e.g. a text box, dropdown, or date
+ * picker. Maps to the {@code form_fields} table.
+ *
+ * Relationships:
+ * - Many FormFields → one parent {@link FormVersion} (owned side).
+ * - {@code @JsonIgnore} on the back-reference prevents infinite serialisation
+ * loops when Jackson writes a FormVersion containing its fields.
+ *
+ * Key fields:
+ * - {@code fieldType} — determines which HTML input is rendered on the
+ * public form page and which SQL column type is used in the submissions table.
+ * - {@code fieldKey} — the SQL column name auto-generated from the label
+ * (e.g. "First Name" → "first_name"). Must be unique per version.
+ * - {@code displayOrder} — the display order of this field on the form.
+ * - {@code validationRules} — stored as JSONB (requires Hibernate's
+ * JdbcTypeCode
+ * annotation). Contains keys like {@code required}, {@code min}, {@code max},
+ * {@code minLength}, {@code maxLength}, {@code pattern}.
+ * - {@code options} — serialised JSON string for choice-based fields:
+ * Dropdown/Radio — {@code ["Option A","Option B"]}
+ * Grid — {@code {"rows":[...],"cols":[...]}}
+ * Lookup — {@code {"formId":"3","fieldKey":"city"}}
+ * - {@code defaultValue} — pre-fills the field for the respondent; stored as
+ * a String regardless of field type.
+ */
+@Entity
+@Table(name = "form_fields", uniqueConstraints = {
+        @UniqueConstraint(columnNames = { "form_version_id", "field_key" })
+})
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+@Builder
+public class FormField {
+
+    @Id
+    @GeneratedValue(strategy = GenerationType.UUID)
+    private UUID id;
+
+    /**
+     * Back-reference to the owning version — hidden from JSON to prevent cycles.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "form_version_id", nullable = false)
+    @JsonIgnore
+    private FormVersion formVersion;
+
+    /** Human-readable label shown to the respondent (e.g. "Your Email Address"). */
+    @Column(name = "label", nullable = false, columnDefinition = "TEXT")
+    private String fieldLabel;
+
+    /**
+     * Auto-generated snake_case SQL column name used in the dynamic submissions
+     * table and in logic-rule conditions (e.g. "your_email_address").
+     * Unique within a version to prevent duplicate columns.
+     */
+    @Column(nullable = false, length = 100)
+    private String fieldKey;
+
+    /** Determines the HTML input type and the PostgreSQL column type. */
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false)
+    private FieldType fieldType;
+
+    /** If true, the submission is rejected if this field is left blank. */
+    @Column(nullable = false)
+    private Boolean isRequired;
+
+    /** Display position on the form canvas — lower numbers appear first. */
+    @Column(nullable = false)
+    private Integer displayOrder;
+
+    /**
+     * Pre-filled value shown to respondents; stored as String for all field types.
+     */
+    @Column(name = "default_value")
+    private String defaultValue;
+
+    /**
+     * JSON validation constraints stored in PostgreSQL JSONB format.
+     * Hibernate's {@code @JdbcTypeCode(SqlTypes.JSON)} handles the
+     * serialisation/deserialisation automatically.
+     * Example keys: required, min, max, minLength, maxLength, pattern.
+     */
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "validation_rules", columnDefinition = "jsonb")
+    private Map<String, Object> validationRules;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "config_json", columnDefinition = "jsonb")
+    private Map<String, Object> configJson;
+
+    /**
+     * Stores option data as a JSON string (TEXT column) for choice-based fields.
+     * Examples:
+     * Dropdown/Radio/Checkboxes — {@code ["Option A","Option B"]}
+     * Grid fields — {@code {"rows":["Row1"],"cols":["Col1"]}}
+     * Lookup field — {@code {"formId":"3","fieldKey":"city"}}
+     */
+    @Column(name = "field_options", columnDefinition = "TEXT")
+    private String options;
+
+    /**
+     * Stores a formula (e.g., 'price * quantity') used to derive the value of this
+     * field.
+     * Evaluated in real-time on the frontend and validated on the backend.
+     */
+    @Column(name = "calculation_formula", columnDefinition = "TEXT")
+    private String calculationFormula;
+
+    /**
+     * The fieldKey of the parent field if this field is nested (e.g., inside a
+     * section).
+     * If null, the field is at the top level.
+     */
+    @Column(name = "parent_column_name", length = 100)
+    private String parentColumnName;
+
+    /**
+     * If true, this field exists in the database but is not shown to respondents
+     * on the public form page.
+     */
+    @Builder.Default
+    @Column(name = "is_hidden", nullable = false)
+    private Boolean isHidden = false;
+
+    @Builder.Default
+    @Column(name = "is_read_only", nullable = false)
+    private Boolean isReadOnly = false;
+
+    @Column(name = "help_text", columnDefinition = "TEXT")
+    private String helpText;
+
+    @Builder.Default
+    @Column(name = "is_disabled", nullable = false)
+    private Boolean isDisabled = false;
+
+    @Builder.Default
+    @Column(name = "is_multi_select", nullable = false)
+    private Boolean isMultiSelect = false;
+
+}

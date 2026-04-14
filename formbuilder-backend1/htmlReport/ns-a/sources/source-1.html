@@ -1,0 +1,166 @@
+
+
+
+<!DOCTYPE html>
+<html id="htmlId">
+<head>
+  <meta http-equiv="Content-Type" content="text/html;charset=UTF-8"> 
+  <title>Coverage Report > CustomPermissionEvaluator</title>
+  <style type="text/css">
+    @import "../../css/coverage.css";
+    @import "../../css/idea.min.css";
+  </style>
+  <script type="text/javascript" src="../../js/highlight.min.js"></script>
+  <script type="text/javascript" src="../../js/highlightjs-line-numbers.min.js"></script>
+</head>
+
+<body>
+<div class="content">
+<div class="breadCrumbs">
+Current scope:     <a href="../../index.html">all classes</a>
+    <span class="separator">|</span>
+    <a href="../index.html">com.sttl.formbuilder2.security</a>
+</div>
+
+<h1>Coverage Summary for Class: CustomPermissionEvaluator (com.sttl.formbuilder2.security)</h1>
+
+<table class="coverageStats">
+<tr>
+  <th class="name">Class</th>
+<th class="coverageStat 
+">
+  Class, %
+</th>
+<th class="coverageStat 
+">
+  Method, %
+</th>
+<th class="coverageStat 
+">
+  Branch, %
+</th>
+<th class="coverageStat 
+">
+  Line, %
+</th>
+</tr>
+<tr>
+  <td class="name">CustomPermissionEvaluator</td>
+<td class="coverageStat">
+  <span class="percent">
+    100%
+  </span>
+  <span class="absValue">
+    (1/1)
+  </span>
+</td>
+<td class="coverageStat">
+  <span class="percent">
+    33.3%
+  </span>
+  <span class="absValue">
+    (1/3)
+  </span>
+</td>
+<td class="coverageStat">
+  <span class="percent">
+    0%
+  </span>
+  <span class="absValue">
+    (0/18)
+  </span>
+</td>
+<td class="coverageStat">
+  <span class="percent">
+    13.3%
+  </span>
+  <span class="absValue">
+    (2/15)
+  </span>
+</td>
+</tr>
+
+</table>
+
+<br/>
+<br/>
+
+
+<pre>
+<code class="sourceCode" id="sourceCode">&nbsp;package com.sttl.formbuilder2.security;
+&nbsp;
+&nbsp;import com.sttl.formbuilder2.model.entity.AppUser;
+&nbsp;import com.sttl.formbuilder2.repository.UserRepository;
+&nbsp;import org.springframework.security.access.PermissionEvaluator;
+&nbsp;import org.springframework.security.core.Authentication;
+&nbsp;import org.springframework.stereotype.Component;
+&nbsp;
+&nbsp;import java.io.Serializable;
+&nbsp;
+&nbsp;@Component
+&nbsp;public class CustomPermissionEvaluator implements PermissionEvaluator {
+&nbsp;
+&nbsp;    private final UserRepository userRepository;
+&nbsp;
+<b class="fc">&nbsp;    public CustomPermissionEvaluator(UserRepository userRepository) {</b>
+<b class="fc">&nbsp;        this.userRepository = userRepository;</b>
+&nbsp;    }
+&nbsp;
+&nbsp;    @Override
+&nbsp;    public boolean hasPermission(Authentication authentication, Object targetDomainObject, Object permission) {
+<b class="nc">&nbsp;        if (authentication == null || targetDomainObject == null || !(permission instanceof String)) {</b>
+<b class="nc">&nbsp;            return false;</b>
+&nbsp;        }
+&nbsp;        // This method can be implemented if passing the actual target object
+<b class="nc">&nbsp;        return false;</b>
+&nbsp;    }
+&nbsp;
+&nbsp;    @Override
+&nbsp;    public boolean hasPermission(Authentication authentication, Serializable targetId, String targetType, Object permission) {
+<b class="nc">&nbsp;        if (authentication == null || targetId == null || targetType == null || !(permission instanceof String)) {</b>
+<b class="nc">&nbsp;            return false;</b>
+&nbsp;        }
+&nbsp;
+<b class="nc">&nbsp;        AppUser user = userRepository.findByUsername(authentication.getName())</b>
+<b class="nc">&nbsp;                .orElse(null);</b>
+&nbsp;        
+<b class="nc">&nbsp;        if (user == null) return false;</b>
+&nbsp;
+<b class="nc">&nbsp;        String permissionName = (String) permission;</b>
+&nbsp;
+<b class="nc">&nbsp;        if (&quot;FORM&quot;.equalsIgnoreCase(targetType)) {</b>
+<b class="nc">&nbsp;            Long formId = (Long) targetId;</b>
+<b class="nc">&nbsp;            return user.hasPermission(permissionName, formId);</b>
+&nbsp;        }
+&nbsp;
+&nbsp;        // Generic global check
+<b class="nc">&nbsp;        return user.hasPermission(permissionName, null);</b>
+&nbsp;    }
+&nbsp;}
+</code>
+</pre>
+</div>
+
+<script type="text/javascript">
+(function() {
+    var msie = false, msie9 = false;
+    /*@cc_on
+      msie = true;
+      @if (@_jscript_version >= 9)
+        msie9 = true;
+      @end
+    @*/
+
+    if (!msie || msie && msie9) {
+      hljs.highlightAll()
+      hljs.initLineNumbersOnLoad();
+    }
+})();
+</script>
+
+<div class="footer">
+    
+    <div style="float:right;">generated on 2026-03-18 11:26</div>
+</div>
+</body>
+</html>
