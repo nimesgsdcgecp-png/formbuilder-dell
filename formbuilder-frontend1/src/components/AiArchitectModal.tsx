@@ -184,6 +184,7 @@ export default function AiArchitectModal({ isOpen, onClose, onImport }: AiArchit
                                  <span className="text-[9px] px-2 py-0.5 rounded-md font-bold uppercase border" style={{ background: 'var(--then-bg, #f5f3ff25)', color: '#8b5cf6', borderColor: 'var(--then-border, #4f29f7)' }}>{msg.schema?.rules?.length || 0} Rules</span>
                               </div>
                            </div>
+                           
                             <div className="space-y-1">
                               <h3 className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>{msg.schema.title}</h3>
                               <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>{msg.schema.description}</p>
